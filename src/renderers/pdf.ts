@@ -1,6 +1,14 @@
 import type { DocumentNode, Theme } from "../types/index.js";
 import { resolveTheme } from "../theme/themes.js";
+import { isSafeDimension, sanitizeStyleValue } from "../security/sanitize.js";
 import { HtmlRenderer, type HtmlRenderOptions } from "./html.js";
+
+/** Vet a page size keyword/dimension before it reaches CSS or the PDF API. */
+const pageSize = (v: string | undefined): string =>
+  (v && sanitizeStyleValue(v)) || "Letter";
+/** Vet a page margin dimension. */
+const pageMargin = (v: string | undefined): string =>
+  v && isSafeDimension(v) ? v : "0.5in";
 
 export interface PrintOptions extends HtmlRenderOptions {
   title?: string;
@@ -11,7 +19,9 @@ export interface PrintOptions extends HtmlRenderOptions {
  * web page into a paginated, print-ready document.
  */
 export function pageCss(theme: Theme): string {
-  return `@page { size: ${theme.page.size}; margin: ${theme.page.margin}; }
+  const size = pageSize(theme.page?.size);
+  const margin = pageMargin(theme.page?.margin);
+  return `@page { size: ${size}; margin: ${margin}; }
 html, body { margin: 0; padding: 0; background: #fff; }
 @media screen { body { background: #f1f5f9; padding: 24px; } .retex-resume { box-shadow: 0 1px 8px rgba(0,0,0,.12); } }`;
 }
@@ -85,16 +95,13 @@ export async function renderPdf(
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
+    const size = pageSize(theme.page?.size);
+    const margin = pageMargin(theme.page?.margin);
     return await page.pdf({
       printBackground: options.printBackground ?? true,
       preferCSSPageSize: true,
-      format: theme.page.size,
-      margin: {
-        top: theme.page.margin,
-        bottom: theme.page.margin,
-        left: theme.page.margin,
-        right: theme.page.margin,
-      },
+      format: size,
+      margin: { top: margin, bottom: margin, left: margin, right: margin },
     });
   } finally {
     await browser.close();

@@ -1,5 +1,9 @@
 %% ReTeX example — a software engineer resume.
-%% Render with:  npx tsx examples/build.ts   (outputs examples/out/*.html)
+%% Render with:  npx tsx examples/build.ts   (outputs examples/rendered/*.html)
+
+%% ReTeX is blank by default — import a theme/library to add styling.
+%% `modern` bundles a styled look plus the color/font/shape commands.
+\usepackage{modern}
 
 \name{Jane Doe}
 \title{Senior Software Engineer}

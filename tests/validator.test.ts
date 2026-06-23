@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { tokenize, parse, validate } from "../src/index.js";
-import { DiagnosticCode, getTheme } from "../src/index.js";
+import { tokenize, parse, validate, applyLibraries } from "../src/index.js";
+import { DiagnosticCode, getTheme, createDefaultRegistry } from "../src/index.js";
 
+// \themecolor lives in the `colors` library; validate against a styled theme so
+// the theme-color check has a palette to check against.
+const registry = applyLibraries(createDefaultRegistry(), ["colors"]).registry;
 const diags = (src: string) => {
-  const { ast } = parse(tokenize(src).tokens);
-  return validate(ast, { theme: getTheme("default") });
+  const { ast } = parse(tokenize(src).tokens, { registry });
+  return validate(ast, { theme: getTheme("modern") });
 };
 const codes = (src: string) => diags(src).map((d) => d.code);
 

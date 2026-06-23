@@ -79,7 +79,8 @@ export class ReactRenderer {
         "ReactRenderer requires a `createElement` factory (e.g. React.createElement).",
       );
     }
-    this.theme = options.theme ?? resolveTheme();
+    // Normalize so every theme sub-object is defined (the theme may be blank).
+    this.theme = resolveTheme(options.theme);
     this.prefix = options.classPrefix ?? "retex";
     this.h = options.createElement;
     this.Fragment = options.Fragment ?? "div";
@@ -120,10 +121,13 @@ export class ReactRenderer {
   /* --------------------------- structuring ---------------------------- */
 
   private renderSection(section: SectionNode, body: Node[]): unknown {
+    const className = this.theme.sectionStyle
+      ? `${this.cls("section")} ${this.cls("section")}--${this.theme.sectionStyle}`
+      : this.cls("section");
     return this.el(
       "section",
       {
-        className: `${this.cls("section")} ${this.cls("section")}--${this.theme.sectionStyle}`,
+        className,
       },
       [
         this.el("h2", { className: this.cls("section-title") }, [section.title]),
@@ -198,10 +202,18 @@ export class ReactRenderer {
         return node.value;
       case "parbreak":
         return null;
+      case "usepackage":
+        // A preamble directive — no visible output.
+        return null;
       case "linebreak":
         return this.el("br", null, []);
-      case "rule":
-        return this.el("hr", { className: this.cls("rule") }, []);
+      case "rule": {
+        const variant =
+          node.style && node.style !== "solid"
+            ? ` ${this.cls(`rule--${node.style}`)}`
+            : "";
+        return this.el("hr", { className: `${this.cls("rule")}${variant}` }, []);
+      }
       case "space":
         return node.axis === "vertical"
           ? this.el("div", { style: { height: this.dim(node.size) } }, [])

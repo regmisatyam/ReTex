@@ -1,4 +1,4 @@
-export { defaultTheme } from "./default.js";
+export { defaultTheme, blankTheme } from "./default.js";
 export {
   resolveTheme,
   getTheme,
@@ -7,4 +7,13 @@ export {
   classicTheme,
   compactTheme,
 } from "./themes.js";
-export type { Theme, PartialTheme } from "../types/theme.js";
+export type {
+  Theme,
+  PartialTheme,
+  ThemeColors,
+  ThemeFonts,
+  ThemeFontSizes,
+  ThemeSpacing,
+  ThemePage,
+  ThemeHeadings,
+} from "../types/theme.js";

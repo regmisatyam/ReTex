@@ -51,9 +51,12 @@ export interface LineBreakNode extends NodeBase {
   type: "linebreak";
 }
 
-/** A horizontal rule (`\hrule` / `\divider`). */
+/** A horizontal rule / divider (`\hrule`, `\divider`, and the `shapes` library's
+ * styled variants like `\dashrule`). */
 export interface RuleNode extends NodeBase {
   type: "rule";
+  /** Visual style. Defaults to a thin solid line when omitted. */
+  style?: "solid" | "dashed" | "dotted" | "thick" | "double";
 }
 
 /** Spacing primitive (`\vspace{1em}` / `\hspace{...}`). */
@@ -67,6 +70,16 @@ export interface SpaceNode extends NodeBase {
 export interface GroupNode extends NodeBase {
   type: "group";
   children: Node[];
+}
+
+/**
+ * `\usepackage{shapes, colors}` — a preamble directive that imports one or more
+ * styling libraries for the document. Produces no visible output; the engine
+ * reads these to register the libraries' commands and merge their theme.
+ */
+export interface UsePackageNode extends NodeBase {
+  type: "usepackage";
+  names: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,6 +290,7 @@ export type Node =
   | RuleNode
   | SpaceNode
   | GroupNode
+  | UsePackageNode
   | MarkNode
   | ColorNode
   | ThemeColorNode
@@ -310,6 +324,7 @@ export interface NodeMap {
   rule: RuleNode;
   space: SpaceNode;
   group: GroupNode;
+  usepackage: UsePackageNode;
   bold: MarkNode;
   italic: MarkNode;
   underline: MarkNode;

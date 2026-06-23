@@ -37,7 +37,8 @@ function printBlocks(nodes: Node[]): string {
       isBlockNode(node) ||
       node.type === "section" ||
       node.type === "list" ||
-      node.type === "columns"
+      node.type === "columns" ||
+      node.type === "usepackage"
     ) {
       flush();
       out.push(printBlock(node));
@@ -78,8 +79,10 @@ function printBlock(node: Node, indent = ""): string {
     }
     case "skills":
       return `${indent}\\skills{${node.items.join(", ")}}`;
+    case "usepackage":
+      return `${indent}\\usepackage{${node.names.join(", ")}}`;
     case "rule":
-      return `${indent}\\hrule`;
+      return indent + ruleCommand(node.style);
     case "space":
       return `${indent}\\${node.axis === "vertical" ? "vspace" : "hspace"}{${node.size}}`;
     case "command":
@@ -132,6 +135,8 @@ function printNode(node: Node): string {
       return `\\url{${node.rawHref}}`;
     case "icon":
       return `\\icon{${node.name}}`;
+    case "usepackage":
+      return `\\usepackage{${node.names.join(", ")}}`;
     case "contact":
       return `\\${node.field}{${node.value}}`;
     case "space":
@@ -145,6 +150,22 @@ function printNode(node: Node): string {
     // Block nodes appearing in inline context fall back to block printing.
     default:
       return printBlock(node);
+  }
+}
+
+/** Map a rule's style back to the command that produces it. */
+function ruleCommand(style: string | undefined): string {
+  switch (style) {
+    case "dashed":
+      return "\\dashrule";
+    case "dotted":
+      return "\\dotrule";
+    case "thick":
+      return "\\thickrule";
+    case "double":
+      return "\\doublerule";
+    default:
+      return "\\hrule";
   }
 }
 

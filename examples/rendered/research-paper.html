@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Research-paper</title>
+<title>research-paper</title>
 <style>
 .retex-resume {
     --retex-color-primary: #111827;
     --retex-color-secondary: #4b5563;
     --retex-color-text: #1e293b;
-    --retex-color-muted: #64748b;
+    --retex-color-muted: #4b5563;
     --retex-color-background: #ffffff;
-    --retex-color-border: #e2e8f0;
+    --retex-color-border: #cbd5e1;
     --retex-color-accent: #111827;
-    --retex-color-success: #16a34a;
     --retex-primary: #111827;
     --retex-text: #1e293b;
-    --retex-muted: #64748b;
-    --retex-border: #e2e8f0;
+    --retex-muted: #4b5563;
+    --retex-border: #cbd5e1;
     --retex-bg: #ffffff;
     --retex-font-heading: Georgia, "Times New Roman", serif;
     --retex-font-body: Georgia, "Times New Roman", serif;
@@ -31,6 +30,12 @@
     --retex-fs-section: 13pt;
     --retex-sp-section: 1.1rem;
     --retex-sp-item: 0.28rem;
+    --retex-section-transform: uppercase;
+    --retex-section-tracking: 0.06em;
+    --retex-name-tracking: -0.01em;
+    --retex-link-decoration: none;
+    --retex-skill-bg: color-mix(in srgb, #111827 12%, transparent);
+    --retex-skill-color: #111827;
 
     box-sizing: border-box;
     max-width: 8.5in;
@@ -51,7 +56,7 @@
     font-weight: 700;
     margin: 0 0 0.1em;
     color: var(--retex-text);
-    letter-spacing: -0.01em;
+    letter-spacing: var(--retex-name-tracking);
 }
 .retex-title {
     font-size: var(--retex-fs-large);
@@ -80,8 +85,8 @@
     font-family: var(--retex-font-heading);
     font-size: var(--retex-fs-section);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    text-transform: var(--retex-section-transform);
+    letter-spacing: var(--retex-section-tracking);
     color: var(--retex-primary);
     margin: 0 0 0.5em;
 }
@@ -124,8 +129,8 @@
 
 .retex-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.2rem 0; padding: 0; }
 .retex-skill {
-    background: color-mix(in srgb, var(--retex-primary) 12%, transparent);
-    color: var(--retex-primary);
+    background: var(--retex-skill-bg);
+    color: var(--retex-skill-color);
     border-radius: 4px;
     padding: 0.12rem 0.5rem;
     font-size: var(--retex-fs-small);
@@ -133,10 +138,14 @@
     white-space: nowrap;
 }
 
-.retex-link { color: var(--retex-primary); text-decoration: none; }
+.retex-link { color: var(--retex-primary); text-decoration: var(--retex-link-decoration); }
 .retex-link:hover { text-decoration: underline; }
 .retex-icon { display: inline-flex; vertical-align: -0.125em; }
 .retex-rule { border: none; border-top: 1px solid var(--retex-border); margin: 0.6rem 0; }
+.retex-rule--dashed { border-top-style: dashed; }
+.retex-rule--dotted { border-top-style: dotted; }
+.retex-rule--thick { border-top-width: 3px; }
+.retex-rule--double { border-top-style: double; border-top-width: 3px; }
 .retex-center { text-align: center; }
 .retex-scale-small { font-size: var(--retex-fs-small); }
 .retex-scale-large { font-size: var(--retex-fs-large); }

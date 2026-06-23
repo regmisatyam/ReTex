@@ -1,9 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { tokenize } from "../src/tokenizer/index.js";
-import { parse } from "../src/parser/index.js";
+import { parse, createDefaultRegistry } from "../src/parser/index.js";
+import { applyLibraries } from "../src/index.js";
 import { DiagnosticCode, type DocumentNode, type Node } from "../src/types/index.js";
 
-const compile = (src: string) => parse(tokenize(src).tokens);
+// Color / font / shape commands now live in libraries; enable them so these
+// command-level unit tests can exercise their builders directly.
+const registry = applyLibraries(createDefaultRegistry(), [
+  "colors",
+  "fonts",
+  "shapes",
+]).registry;
+const compile = (src: string) => parse(tokenize(src).tokens, { registry });
 const ast = (src: string): DocumentNode => compile(src).ast;
 const first = (src: string): Node =>
   ast(src).children.find((n) => n.type !== "text" || n.value.trim() !== "")!;

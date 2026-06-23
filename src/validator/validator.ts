@@ -55,7 +55,7 @@ export function validate(ast: DocumentNode, options: ValidateOptions = {}): Diag
           }
           break;
         case "themecolor":
-          if (options.theme && !(node.token in options.theme.colors)) {
+          if (options.theme?.colors && !(node.token in options.theme.colors)) {
             report({
               severity: DiagnosticSeverity.Warning,
               code: DiagnosticCode.UnknownThemeColor,

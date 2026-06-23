@@ -99,7 +99,8 @@ describe("html renderer — full document", () => {
 
 describe("html renderer — snapshots", () => {
   it("matches the resume snapshot", () => {
-    const src = `\\name{John Doe}
+    const src = `\\usepackage{colors}
+\\name{John Doe}
 \\title{Senior Software Engineer}
 \\email{john@example.com}
 \\location{New York, NY}
@@ -120,7 +121,7 @@ Built \\textbf{distributed systems}. Reduced latency by 40\\%.
 
   it("matches the typography snapshot", () => {
     const src =
-      "\\textbf{a} \\textit{b} \\underline{c} {\\Large big} \\textcolor{#fff}{w}";
+      "\\usepackage{fonts, colors}\n\\textbf{a} \\textit{b} \\underline{c} {\\Large big} \\textcolor{#fff}{w}";
     expect(html(src)).toMatchSnapshot();
   });
 });

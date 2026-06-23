@@ -43,6 +43,7 @@ export function splitPreamble(nodes: Node[]): PreambleParts {
     (n) =>
       !CONTACTISH.has(n.type) &&
       n.type !== "parbreak" &&
+      n.type !== "usepackage" &&
       !(n.type === "text" && n.value.trim() === ""),
   );
   return { name, title, contacts, other };

@@ -1,5 +1,8 @@
 %% ReTeX example — an academic CV / research profile.
 
+%% The `classic` theme pack gives a restrained serif look for academic CVs.
+\usepackage{classic}
+
 \name{Dr. Alan Researcher}
 \title{Assistant Professor of Computer Science}
 

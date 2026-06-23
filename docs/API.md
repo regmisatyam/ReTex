@@ -14,12 +14,18 @@ import { renderReact } from "retex/react";
 - [AST utilities](#ast-utilities)
 - [Renderers](#renderers)
 - [Theming](#theming)
+- [Libraries](#libraries)
 - [Plugins](#plugins)
 - [Editor](#editor)
 - [Incremental](#incremental)
 - [Security](#security)
 - [Icons](#icons)
 - [Key interfaces](#key-interfaces)
+
+> **ReTeX is blank by default.** The core ships structure + basic emphasis;
+> color, fonts, and shapes come from **[libraries](#libraries)** you activate
+> with `\usepackage{...}` in a document or `engine.use(...)` in code. The
+> `library` exports are also available from the `retex/library` subpath.
 
 ---
 
@@ -44,10 +50,11 @@ class ReTeXEngine implements PluginHost {
   toJson(input: string | DocumentNode, options?: JsonRenderOptions): string;
   toPrintHtml(input: string | DocumentNode, options?: PrintOptions): string;
   toPdf(input: string | DocumentNode, options?: PdfOptions): Promise<Uint8Array>;
-  styles(): string;
+  styles(input?: string | DocumentNode): string;
 
-  // Plugins & extension
+  // Plugins, libraries & extension
   use(plugin: ReTeXPlugin): this;
+  provideLibrary(library: ReTeXLibrary): this;
   registerCommand(def: EngineCommand): this;
   registerEnvironment(def: EnvironmentDefinition): this;
   registerHtmlRenderer(key: string, fn: HtmlRenderFn): this;
@@ -75,14 +82,15 @@ function createEngine(options?: EngineOptions): ReTeXEngine;
 | `toJson`                | Render the AST to a JSON string.                                          |
 | `toPrintHtml`           | Render print-ready, paginated standalone HTML.                           |
 | `toPdf`                 | Render to a PDF byte buffer (needs Puppeteer or a `launch` adapter).      |
-| `styles`                | The CSS stylesheet for the active theme.                                  |
-| `use`                   | Install a plugin (commands, envs, icons, renderers, theme, `setup`).      |
+| `styles`                | The CSS stylesheet for the active theme. Pass the document to fold in libraries it `\usepackage`s. |
+| `use`                   | Install a plugin/library globally (commands, envs, icons, renderers, theme, `setup`). |
+| `provideLibrary`        | Make a library available to `\usepackage{name}` without activating it globally. Built-ins are always available. |
 | `registerCommand`       | Add/override a command, optionally with inline `render` functions.        |
 | `registerEnvironment`   | Add/override an environment.                                              |
 | `registerHtmlRenderer`  | Add an HTML override keyed by node `type` or `command:<name>`.            |
 | `registerReactRenderer` | Add a React override keyed by node `type` or `command:<name>`.            |
 | `registerIcon`          | Add/override an icon.                                                     |
-| `setTheme` / `getTheme` | Replace (partials are deep-merged) / read the active theme.               |
+| `setTheme` / `getTheme` | Set / read the active theme. A **named** theme replaces; an anonymous patch is deep-merged over the current theme. |
 | `getRegistry`           | Access the engine's `CommandRegistry`.                                   |
 
 > Mutating the engine (`use`, `register*`, `setTheme`) invalidates the compile
@@ -216,7 +224,8 @@ Related types: `HtmlRenderOptions`, `JsonRenderOptions`, `PrintOptions`,
 ## Theming
 
 ```ts
-const defaultTheme: Theme;
+const blankTheme:   Theme;  // the default — no styling at all
+const defaultTheme: Theme;  // alias of blankTheme
 const modernTheme:  Theme;
 const classicTheme: Theme;
 const compactTheme: Theme;
@@ -226,18 +235,94 @@ function resolveTheme(partial?: PartialTheme, base?: Theme): Theme;
 function getTheme(name: string): Theme;
 ```
 
-| Export         | Description                                                  |
-| -------------- | ----------------------------------------------------------- |
-| `defaultTheme` | The canonical base theme; all presets override it.         |
-| `modernTheme`  | Accent-forward, underlined section headings.               |
-| `classicTheme` | Restrained serif theme for academic CVs.                   |
-| `compactTheme` | High-density, single-accent theme.                        |
-| `themes`       | Map of presets keyed by name.                             |
-| `resolveTheme` | Deep-merge a partial over a base (default: `defaultTheme`).|
-| `getTheme`     | Look up a preset by name (falls back to default).         |
+| Export         | Description                                                       |
+| -------------- | ---------------------------------------------------------------- |
+| `blankTheme`   | The **default**: no colors, fonts, sizes, or section decoration. |
+| `defaultTheme` | Alias of `blankTheme`.                                            |
+| `modernTheme`  | Accent-forward, underlined section headings (opt-in).            |
+| `classicTheme` | Restrained serif theme for academic CVs (opt-in).               |
+| `compactTheme` | High-density, single-accent theme (opt-in).                     |
+| `themes`       | Map of presets keyed by name (`blank`, `default`, `modern`, …). |
+| `resolveTheme` | Deep-merge a partial over a base (default: `blankTheme`); result always has defined sub-objects. |
+| `getTheme`     | Look up a preset by name (falls back to the blank default).     |
+
+Every `Theme` field is **optional** — the blank theme defines none of them, and
+renderers substitute neutral, unstyled fallbacks. Importing a library or theme
+pack fills the fields in.
 
 Related types: `Theme`, `PartialTheme`, `ThemeColors`, `ThemeFonts`,
-`ThemeFontSizes`, `ThemeSpacing`, `ThemePage`.
+`ThemeFontSizes`, `ThemeSpacing`, `ThemePage`, `ThemeHeadings`.
+
+---
+
+## Libraries
+
+Libraries are opt-in bundles of styling capability. Built-ins are always
+available to `\usepackage`; you can also install them in code or register your
+own.
+
+```ts
+// Built-in library objects (each is a ReTeXLibrary, i.e. a named ReTeXPlugin)
+const colorsLibrary:  ReTeXLibrary;  // \textcolor, \themecolor
+const fontsLibrary:   ReTeXLibrary;  // \fontfamily, \fontsize, \small…\Huge, \ttfamily
+const shapesLibrary:  ReTeXLibrary;  // \hrule, \dashrule, …, \vspace, \hspace
+const modernLibrary:  ReTeXLibrary;  // modern theme + the three toolkits
+const classicLibrary: ReTeXLibrary;
+const compactLibrary: ReTeXLibrary;
+
+// Command lists & catalogs
+const colorCommands: CommandDefinition[];
+const fontCommands:  CommandDefinition[];
+const shapeCommands: CommandDefinition[];
+const palettes:   Record<string, ThemeColors>;  // named color palettes
+const fontStacks: Record<string, string>;        // named CSS font stacks
+function fontTheme(spec: Partial<Record<keyof ThemeFonts, string>>): ThemeFonts;
+
+// Registry & resolution
+const builtinLibraries: Record<string, ReTeXLibrary>;
+function builtinLibraryNames(): string[];
+function getBuiltinLibrary(name: string): ReTeXLibrary | undefined;
+function resolveLibraryName(name: string): string | undefined;
+const GATED_COMMANDS: Record<string, string>;     // command → library name
+
+// Lower-level helpers (used by the engine/editor; exported for advanced use)
+function usedLibraryNamesFromTokens(tokens: Token[]): string[];
+function usedLibraryNamesFromAst(root: Node): string[];
+function applyLibraries(base: CommandRegistry, names: string[], lookup?: LibraryLookup): AppliedLibraries;
+function mergeLibraryTheme(base: Theme, libraries: ReTeXLibrary[]): Theme;
+function collectLibraryOverrides(libraries: ReTeXLibrary[]): { html: Map<string, HtmlRenderFn>; react: Map<string, ReactRenderFn> };
+function libraryDiagnostics(ast: DocumentNode, diagnostics: Diagnostic[], lookup?: LibraryLookup): Diagnostic[];
+```
+
+| Export                     | Description                                                          |
+| -------------------------- | ------------------------------------------------------------------- |
+| `colorsLibrary` / `fontsLibrary` / `shapesLibrary` | The three toolkits.                         |
+| `modernLibrary` / `classicLibrary` / `compactLibrary` | Theme packs: a styled look **plus** all three toolkits. |
+| `palettes` / `fontStacks`  | Catalogs of named color palettes / font stacks.                     |
+| `fontTheme`                | Build a `fonts` theme patch from named stacks.                      |
+| `builtinLibraries` / `getBuiltinLibrary` / `resolveLibraryName` | Look libraries up by name (aliases included). |
+| `GATED_COMMANDS`           | Map of every library command → the library that provides it.        |
+| `applyLibraries`           | Clone a registry and add the named libraries' commands (never mutates the base). |
+| `mergeLibraryTheme`        | Fold libraries' theme patches over a base theme.                    |
+| `libraryDiagnostics`       | Add "needs `\usepackage{...}`" / "unknown library" diagnostics.     |
+
+A `ReTeXLibrary` is a `ReTeXPlugin` with a stable `name` (plus optional
+`summary`). Install one globally with `engine.use(lib)`, make it available to
+`\usepackage` with `engine.provideLibrary(lib)`, or pass either via
+`EngineOptions`. The library exports are also published at the `retex/library`
+subpath.
+
+```ts
+import { ReTeXEngine } from "retex";
+import { colorsLibrary, palettes } from "retex/library";
+
+const engine = new ReTeXEngine({
+  plugins: [colorsLibrary],                 // \textcolor now always available
+  theme: { colors: palettes.violet },       // and a violet palette
+});
+```
+
+Related types: `ReTeXLibrary`, `LibraryLookup`, `AppliedLibraries`.
 
 ---
 
@@ -309,9 +394,14 @@ function printDocument(ast: DocumentNode): string;
 | `inspect`           | Parse to a `DocumentNode` for debugging.                              |
 | `printDocument`     | Serialize an AST back to canonical ReTeX source (used by `format`).    |
 
-All methods are pure and synchronous. Related types: `EditorServiceOptions`,
-`CompletionItem`, `CompletionKind`, `HoverInfo`, `SemanticToken`,
-`SemanticTokenType`.
+All methods are pure and synchronous. The editor is **library-aware**: it reads
+`\usepackage{...}` directives in the source so completions, hover, diagnostics,
+and highlighting recognize the imported libraries' commands. Gated commands you
+haven't imported still appear in completions (labelled with the library to
+import). Pass custom libraries via `EditorServiceOptions.libraries`.
+
+Related types: `EditorServiceOptions`, `CompletionItem`, `CompletionKind`,
+`HoverInfo`, `SemanticToken`, `SemanticTokenType`.
 
 ---
 
@@ -367,7 +457,7 @@ function isBalanced(text: string): boolean;
 
 | Member                   | Description                                                          |
 | ------------------------ | ------------------------------------------------------------------ |
-| `IncrementalCompiler`    | Block-level, cache-backed compiler for live preview.               |
+| `IncrementalCompiler`    | Block-level, cache-backed compiler for live preview. Library-aware (scans the whole document for `\usepackage`). |
 | `compile`                | Parse with per-block caching; returns `{ ast, diagnostics, stats }`. |
 | `reset`                  | Clear the block cache.                                             |
 | `splitBalancedSegments`  | Split source into brace/env-balanced blocks at blank lines.        |
@@ -436,6 +526,12 @@ The main option and result objects, reproduced from the source for convenience.
 interface EngineOptions {
   theme?: Theme | PartialTheme;
   plugins?: ReTeXPlugin[];
+  /**
+   * Libraries made available to `\usepackage{name}` **without** activating them
+   * globally (unlike `plugins`, which install commands for every document).
+   * Built-ins (`fonts`, `shapes`, `colors`, `modern`, …) are always available.
+   */
+  libraries?: ReTeXLibrary[];
   classPrefix?: string;
   /** Max number of compiled documents to cache. Default 64. */
   cacheSize?: number;
@@ -514,17 +610,21 @@ range? }`.
 
 ### `Theme`
 
+Every field is optional — the blank default defines none of them.
+
 ```ts
 interface Theme {
   name: string;
-  colors: ThemeColors;       // primary, secondary, text, muted, background, border, + custom tokens
-  fonts: ThemeFonts;         // heading, body, mono
-  fontSizes: ThemeFontSizes; // base, small, large, Large, Huge, name, section
-  spacing: ThemeSpacing;     // unit, section, item, page
-  page: ThemePage;           // size, margin, maxWidth
-  sectionStyle: "underline" | "rule" | "plain" | "bar";
+  colors?: ThemeColors;       // primary, secondary, text, muted, background, border, + custom tokens
+  fonts?: ThemeFonts;         // heading, body, mono
+  fontSizes?: ThemeFontSizes; // base, small, large, Large, Huge, name, section
+  spacing?: ThemeSpacing;     // unit, section, item, page
+  page?: ThemePage;           // size, margin, maxWidth
+  sectionStyle?: "underline" | "rule" | "plain" | "bar";
+  headings?: ThemeHeadings;   // transform, tracking, nameTracking (decorative)
 }
 ```
 
-`PartialTheme` mirrors `Theme` with every field (and sub-field) optional; it is
-deep-merged over a base by `resolveTheme`.
+`PartialTheme` mirrors `Theme` with `name` optional too; it is deep-merged over a
+base by `resolveTheme`. A blank theme (all fields absent) renders a plain,
+browser-default document; libraries and theme packs populate these fields.

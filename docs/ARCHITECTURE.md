@@ -43,6 +43,14 @@ The `ReTeXEngine` (`src/engine.ts`) wires these together, adds an LRU compile
 cache, owns the active theme and the per-instance command registry, and applies
 plugins. Each subsystem is also exported standalone for fine-grained use.
 
+**Blank core + libraries.** The core is intentionally minimal: document
+structure and basic text emphasis only. Color, fonts, and shapes live in
+opt-in **libraries** (`src/library/`) activated per-document with
+`\usepackage{...}` or globally with `engine.use(...)`. Before parsing, the
+engine scans for `\usepackage` directives, clones its base registry, and adds
+the requested libraries' commands; before rendering, it folds those libraries'
+theme patches into the effective theme. See [The library layer](#the-library-layer).
+
 ---
 
 ## Stage 1 — Tokenizer
@@ -142,8 +150,14 @@ It complements the parser's *syntactic* diagnostics with *semantic* ones:
 - empty `\section` headings and empty contact fields;
 - stray `\item` / `\column` that survived as raw command nodes (i.e. used outside
   their environment) — these are errors;
-- `\themecolor{token}` referencing a token not present in the supplied theme;
+- `\themecolor{token}` referencing a token not present in the supplied theme
+  (only checked when the theme actually defines colors — a blank theme skips it);
 - empty `\skills`.
+
+Library-related diagnostics (a gated command used without its `\usepackage`, or
+an unknown library name) are added separately by `libraryDiagnostics`
+(`src/library/registry.ts`), which the engine, editor, and incremental compiler
+all share.
 
 Validation is optional: `engine.compile(source, { validate: false })` (and
 `engine.parse`) skip it.
@@ -234,7 +248,7 @@ of the source.
 
 | Family            | Node types                                                                 |
 | ----------------- | ------------------------------------------------------------------------- |
-| **Structural**    | `document`, `text`, `parbreak`, `linebreak`, `rule`, `space`, `group`     |
+| **Structural**    | `document`, `text`, `parbreak`, `linebreak`, `rule`, `space`, `group`, `usepackage` |
 | **Typography**    | `bold`, `italic`, `underline`, `strike` (`MarkNode`), `color`, `themecolor`, `fontsize`, `fontfamily`, `fontscale` |
 | **Links & icons** | `link`, `url`, `icon`                                                      |
 | **Sections/lists**| `section`, `list`, `item`                                                  |
@@ -245,6 +259,14 @@ of the source.
 Every node extends `NodeBase` with an optional `range` (source span) and an
 optional lazily-populated `hash` (used by the incremental/render caches). Helper
 predicates `isParent`, `isNode<T>` and the `NodeMap` type enable typed visitors.
+
+> The styling node types (`color`, `themecolor`, `fontsize`, `fontfamily`,
+> `fontscale`, `rule`, `space`) and their renderer handlers stay in the core —
+> only the **commands** that produce them moved into libraries. So gating a
+> command never touches the rendering path: the node simply isn't produced
+> unless its library is active. `rule` carries an optional `style`
+> (`dashed`/`dotted`/`thick`/`double`) for the shapes library's variants;
+> `usepackage` is a preamble directive that renders to nothing.
 
 ### AST utilities
 
@@ -269,10 +291,19 @@ environment definitions that **drives both parsing and extensibility**.
 
 - The **parser** reads it for argument signatures, scope behavior, and node
   builders.
-- The **plugin system** mutates it to add commands/environments.
+- The **plugin/library system** mutates it to add commands/environments.
 - It is **per-engine**: `createDefaultRegistry()` builds a fresh registry for
   each `ReTeXEngine`, and `clone()` copies the maps — so plugins extend a private
   copy and never touch global state.
+
+`createDefaultRegistry()` now holds only the **blank core**: structure, basic
+emphasis (`\textbf`/`\textit`/`\underline`/`\sout`/`\bfseries`/`\itshape`),
+links, sections, contact, entries, icons, the list/column/center environments,
+and the `\usepackage`/`\use` directive. Library commands are layered on per
+compile via `applyLibraries(base, names, lookup)`, which **clones** the base and
+registers the resolved libraries' commands — the base is never mutated, so two
+documents compiled by the same engine with different `\usepackage` sets stay
+isolated.
 
 A `CommandDefinition` (`src/types/commands.ts`) carries: `name`, `category`
 (`inline` / `block` / `switch` / `meta`), `args` (`ArgSpec[]`), `scoped`,
@@ -291,21 +322,65 @@ Builders receive a `BuildContext` with the parsed `args`, the switch `scope`, a
 **Location:** `src/types/theme.ts`, `src/theme/`.
 
 Themes are **plain data** (no functions), so they serialize, ship over the wire,
-and compose at runtime. A `Theme` has `name`, `colors`, `fonts`, `fontSizes`,
-`spacing`, `page`, and a `sectionStyle` hint (`underline` | `rule` | `plain` |
-`bar`). The `colors` map is open-ended — arbitrary named swatches are addressable
-via `\themecolor{name}`.
+and compose at runtime. A `Theme` has `name` plus the **all-optional** groups
+`colors`, `fonts`, `fontSizes`, `spacing`, `page`, the `sectionStyle` hint
+(`underline` | `rule` | `plain` | `bar`), and `headings` (decorative
+transform/tracking). The `colors` map is open-ended — arbitrary named swatches
+are addressable via `\themecolor{name}`.
 
-- `defaultTheme` is the canonical base; all presets are partial overrides of it.
-- `resolveTheme(partial, base?)` deep-merges a `PartialTheme` over a base.
-- Presets: `modernTheme`, `classicTheme`, `compactTheme`; plus the `themes` map
-  and `getTheme(name)` lookup.
-- `themeToCss(theme, prefix)` emits the stylesheet, exposing every theme value as
-  a `--<prefix>-…` CSS custom property (and every color as
-  `--<prefix>-color-<token>`).
+- **Blank by default.** `blankTheme` (exported as `defaultTheme`) defines *none*
+  of these fields — a document rendered with it is a plain, browser-default page.
+- `resolveTheme(partial, base?)` deep-merges a `PartialTheme` over a base
+  (default `blankTheme`) and always returns defined sub-objects, so consumers can
+  read `theme.colors` etc. safely.
+- Opt-in presets: `modernTheme`, `classicTheme`, `compactTheme`; plus the
+  `themes` map and `getTheme(name)` lookup (`blank`/`default` map to the blank one).
+- `themeToCss(theme, prefix)` emits the stylesheet. **Structure** (flex rows,
+  list indents, spacing rhythm) is always emitted; **decoration** (accent colors,
+  fonts, uppercased headings, skill chips, section rules) is driven by CSS custom
+  properties whose fallbacks are neutral — so a blank theme renders cleanly and a
+  library/theme simply fills the variables in. Every color is also exposed as
+  `--<prefix>-color-<token>`.
 
 The engine accepts either a full `Theme` or a `PartialTheme` in its options or
-via `setTheme`; partials are resolved against the current theme.
+via `setTheme`. A **named** theme replaces (merged over blank); an anonymous
+patch is merged over the current theme.
+
+---
+
+## The library layer
+
+**Location:** `src/library/`.
+
+Libraries are the opt-in styling layer over the blank core. A `ReTeXLibrary`
+(`src/library/types.ts`) is simply a `ReTeXPlugin` with a stable `name`, so it
+can contribute commands, environments, icons, render overrides, and a theme
+patch.
+
+- **Built-ins** (`src/library/registry.ts`): `colors`, `fonts`, `shapes`, and
+  the theme packs `modern`/`classic`/`compact` (which bundle a theme **plus** the
+  three toolkits). `color`/`font`/`shape` are singular aliases.
+- **Activation** is two-way: a `\usepackage{...}` directive in the source, or
+  `engine.use(lib)` (global) / `engine.provideLibrary(lib)` (available to
+  `\usepackage` only) / `EngineOptions.libraries` in code.
+- **Resolution flow** (in `engine.compile`):
+  1. `usedLibraryNamesFromTokens(tokens)` scans the token stream for
+     `\usepackage`/`\use` directives.
+  2. `applyLibraries(this.registry, names, lookup)` clones the base registry and
+     adds the resolved libraries' commands; unknown names are flagged.
+  3. The parser runs against that per-compile registry, so commands that follow a
+     directive parse correctly.
+  4. `libraryDiagnostics(ast, …)` rewrites the generic "unknown command"
+     diagnostic for a gated command into "add `\usepackage{<lib>}`", and flags
+     unknown library names.
+- **Rendering** (`engine.bundle`): `usedLibraryNamesFromAst(ast)` recovers the
+  used libraries from the `\usepackage` nodes (so it works for a pre-parsed
+  `DocumentNode` too), `mergeLibraryTheme` folds their theme patches over the
+  engine theme, and `collectLibraryOverrides` merges any render overrides.
+
+Because gated commands produce **core** node types, the renderers need no
+changes to support libraries — the per-document override merging exists only for
+*custom* libraries that ship their own render functions.
 
 ---
 
@@ -365,7 +440,7 @@ src/
 ├── parser/
 │   ├── parser.ts         # recursive-descent parser with error recovery
 │   ├── registry.ts       # CommandRegistry
-│   ├── builtins.ts       # every built-in command + environment (createDefaultRegistry)
+│   ├── builtins.ts       # the blank core: structure, emphasis, \usepackage (createDefaultRegistry)
 │   ├── args.ts           # parseKeyValArg, parseListArg, splitTopLevel
 │   ├── suggest.ts        # levenshtein, closestMatch ("did you mean?")
 │   └── index.ts
@@ -388,8 +463,16 @@ src/
 │   └── index.ts
 │
 ├── theme/
-│   ├── default.ts        # defaultTheme
-│   ├── themes.ts         # resolveTheme, presets, themes map, getTheme
+│   ├── default.ts        # blankTheme (= defaultTheme)
+│   ├── themes.ts         # resolveTheme, opt-in presets, themes map, getTheme
+│   └── index.ts
+├── library/
+│   ├── types.ts          # ReTeXLibrary
+│   ├── colors.ts         # colorsLibrary, colorCommands, palettes
+│   ├── fonts.ts          # fontsLibrary, fontCommands, fontStacks, fontTheme
+│   ├── shapes.ts         # shapesLibrary, shapeCommands
+│   ├── themes.ts         # modern/classic/compact library packs
+│   ├── registry.ts       # builtins, resolution, applyLibraries, libraryDiagnostics, …
 │   └── index.ts
 ├── plugin/
 │   ├── types.ts          # ReTeXPlugin, EngineCommand, PluginHost
@@ -414,7 +497,7 @@ src/
     ├── tokens.ts         # TokenType, Token
     ├── ast.ts            # the Node union + NodeMap + guards
     ├── diagnostics.ts    # DiagnosticSeverity, DiagnosticCode, Diagnostic
-    ├── theme.ts          # Theme, PartialTheme
+    ├── theme.ts          # Theme, PartialTheme, ThemeHeadings (all fields optional)
     ├── commands.ts       # CommandDefinition, EnvironmentDefinition, ArgSpec…
     └── index.ts
 ```
@@ -423,7 +506,16 @@ src/
 
 ## Extension points
 
-ReTeX is designed to be extended without forking. There are four:
+ReTeX is designed to be extended without forking. There are five:
+
+### 0. Libraries
+
+A `ReTeXLibrary` is a named `ReTeXPlugin` that can be activated from the document
+(`\usepackage{name}`) as well as from code. Built-ins (`colors`, `fonts`,
+`shapes`, `modern`, `classic`, `compact`) are always available; register your own
+with `engine.provideLibrary(lib)` (addressable by `\usepackage`) or
+`engine.use(lib)` (installed globally). This is the recommended way to ship a
+reusable styling bundle, since it works for document authors *and* code.
 
 ### 1. Plugins
 

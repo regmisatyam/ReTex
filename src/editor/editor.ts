@@ -13,6 +13,15 @@ import { Parser } from "../parser/parser.js";
 import { CommandRegistry } from "../parser/registry.js";
 import { createDefaultRegistry } from "../parser/builtins.js";
 import { validate } from "../validator/index.js";
+import {
+  applyLibraries,
+  libraryDiagnostics,
+  mergeLibraryTheme,
+  usedLibraryNamesFromTokens,
+  getBuiltinLibrary,
+  GATED_COMMANDS,
+  type ReTeXLibrary,
+} from "../library/index.js";
 import { printDocument } from "./printer.js";
 
 export type CompletionKind = "command" | "environment" | "field" | "snippet";
@@ -57,6 +66,11 @@ export interface SemanticToken {
 export interface EditorServiceOptions {
   registry?: CommandRegistry;
   theme?: Theme;
+  /**
+   * Custom libraries addressable via `\usepackage{name}`. Built-in libraries
+   * (`fonts`, `shapes`, `colors`, `modern`, …) are always available.
+   */
+  libraries?: ReTeXLibrary[];
 }
 
 /**
@@ -68,20 +82,37 @@ export interface EditorServiceOptions {
 export class EditorService {
   private readonly registry: CommandRegistry;
   private readonly theme?: Theme;
+  private readonly customLibraries = new Map<string, ReTeXLibrary>();
 
   constructor(options: EditorServiceOptions = {}) {
     this.registry = options.registry ?? createDefaultRegistry();
     this.theme = options.theme;
+    for (const lib of options.libraries ?? []) {
+      this.customLibraries.set(lib.name.trim().toLowerCase(), lib);
+    }
+  }
+
+  private lookupLibrary = (name: string): ReTeXLibrary | undefined =>
+    this.customLibraries.get(name.trim().toLowerCase()) ?? getBuiltinLibrary(name);
+
+  /** Build a registry that includes the libraries the source imports. */
+  private registryFor(tokens: Token[]): CommandRegistry {
+    const names = usedLibraryNamesFromTokens(tokens);
+    return applyLibraries(this.registry, names, this.lookupLibrary).registry;
   }
 
   /* ----------------------------- diagnostics -------------------------- */
 
   getDiagnostics(source: string): Diagnostic[] {
     const { tokens, diagnostics: lex } = tokenize(source);
-    const { ast, diagnostics: parse } = new Parser(tokens, {
-      registry: this.registry,
-    }).parse();
-    return [...lex, ...parse, ...validate(ast, this.theme ? { theme: this.theme } : {})];
+    const names = usedLibraryNamesFromTokens(tokens);
+    const { registry, libraries } = applyLibraries(this.registry, names, this.lookupLibrary);
+    const { ast, diagnostics: parse } = new Parser(tokens, { registry }).parse();
+    const diagnostics = libraryDiagnostics(ast, [...lex, ...parse], this.lookupLibrary);
+    // Merge any imported libraries' theme so `\themecolor` tokens are validated
+    // against the effective palette (mirrors what the engine does).
+    const theme = this.theme ? mergeLibraryTheme(this.theme, libraries) : undefined;
+    return [...diagnostics, ...validate(ast, theme ? { theme } : {})];
   }
 
   /* ------------------------------ inspect ----------------------------- */
@@ -89,7 +120,7 @@ export class EditorService {
   /** Parse and return the AST for inspection / debugging. */
   inspect(source: string): DocumentNode {
     const { tokens } = tokenize(source);
-    return new Parser(tokens, { registry: this.registry }).parse().ast;
+    return new Parser(tokens, { registry: this.registryFor(tokens) }).parse().ast;
   }
 
   /* ------------------------------ format ------------------------------ */
@@ -102,12 +133,13 @@ export class EditorService {
 
   getCompletions(source: string, offset: number): CompletionItem[] {
     const before = source.slice(0, offset);
+    const registry = this.registryFor(tokenize(source).tokens);
 
     const envMatch = /\\(begin|end)\{([a-zA-Z*]*)$/.exec(before);
     if (envMatch) {
       const prefix = envMatch[2]!;
       const start = offset - prefix.length;
-      return this.registry
+      return registry
         .allEnvironments()
         .filter((e) => e.name.startsWith(prefix))
         .map((e) => this.environmentCompletion(e, this.rangeAt(source, start, offset)));
@@ -127,11 +159,26 @@ export class EditorService {
     if (cmdMatch) {
       const prefix = cmdMatch[1]!;
       const start = offset - prefix.length - 1; // include the backslash
-      return this.registry
+      const range = this.rangeAt(source, start, offset);
+      const active = registry
         .allCommands()
         .filter((c) => c.name.startsWith(prefix))
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map((c) => this.commandCompletion(c, this.rangeAt(source, start, offset)));
+        .map((c) => this.commandCompletion(c, range));
+      // Surface gated commands that aren't active yet, so they're discoverable.
+      const present = new Set(registry.commandNames());
+      const gated: CompletionItem[] = Object.entries(GATED_COMMANDS)
+        .filter(([name]) => name.startsWith(prefix) && !present.has(name))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, lib]) => ({
+          label: `\\${name}`,
+          kind: "command" as const,
+          detail: `requires \\usepackage{${lib}}`,
+          documentation: `\`\\${name}\` is provided by the **${lib}** library. Add \`\\usepackage{${lib}}\` to your preamble to use it.`,
+          insertText: name,
+          range,
+        }));
+      return [...active, ...gated];
     }
 
     return [];
@@ -193,6 +240,7 @@ export class EditorService {
 
   getHover(source: string, offset: number): HoverInfo | null {
     const { tokens } = tokenize(source);
+    const registry = this.registryFor(tokens);
     const idx = tokens.findIndex(
       (t) =>
         t.type === TokenType.Command &&
@@ -204,7 +252,7 @@ export class EditorService {
 
     if (token.value === "begin" || token.value === "end") {
       const name = this.readNameAfter(tokens, idx);
-      const env = name ? this.registry.getEnvironment(name) : undefined;
+      const env = name ? registry.getEnvironment(name) : undefined;
       if (env) {
         return {
           contents: this.environmentDoc(env),
@@ -214,12 +262,13 @@ export class EditorService {
       return null;
     }
 
-    const def = this.registry.getCommand(token.value);
+    const def = registry.getCommand(token.value);
     if (!def) {
-      return {
-        contents: `Unknown command \`\\${token.value}\``,
-        range: token.range,
-      };
+      const lib = GATED_COMMANDS[token.value];
+      const contents = lib
+        ? `\`\\${token.value}\` is provided by the **${lib}** library.\n\nAdd \`\\usepackage{${lib}}\` to your preamble to use it.`
+        : `Unknown command \`\\${token.value}\``;
+      return { contents, range: token.range };
     }
     return { contents: this.commandDoc(def), range: token.range };
   }
@@ -248,6 +297,7 @@ export class EditorService {
 
   getSemanticTokens(source: string): SemanticToken[] {
     const { tokens } = tokenize(source);
+    const registry = this.registryFor(tokens);
     const out: SemanticToken[] = [];
     for (let i = 0; i < tokens.length; i++) {
       const t = tokens[i]!;
@@ -257,7 +307,7 @@ export class EditorService {
             out.push({ range: t.range, type: "environment", modifiers: [] });
             break;
           }
-          const def = this.registry.getCommand(t.value);
+          const def = registry.getCommand(t.value);
           out.push({
             range: t.range,
             type: def ? "command" : "command-unknown",

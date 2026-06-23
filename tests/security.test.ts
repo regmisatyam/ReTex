@@ -84,7 +84,7 @@ describe("end-to-end XSS resistance (HTML renderer)", () => {
   });
 
   it("drops unsafe inline colors", () => {
-    const out = html("\\textcolor{red;}{x}");
+    const out = html("\\usepackage{colors}\n\\textcolor{red;}{x}");
     expect(out).not.toContain("red;");
   });
 

@@ -1,43 +1,92 @@
 import type { Theme } from "../types/index.js";
+import {
+  isSafeColor,
+  isSafeDimension,
+  sanitizeStyleValue,
+} from "../security/sanitize.js";
 
 const tokenSafe = (s: string): string => s.replace(/[^a-zA-Z0-9_-]/g, "");
 
+const has = (v: string | undefined): v is string => v != null && v !== "";
+
+/** A theme color, only if safe; otherwise the neutral fallback. */
+const color = (v: string | undefined, fallback: string): string =>
+  has(v) && isSafeColor(v) ? v : fallback;
+
+/** A theme dimension (size/spacing), only if safe; otherwise the fallback. */
+const dim = (v: string | undefined, fallback: string): string =>
+  has(v) && isSafeDimension(v) ? v : fallback;
+
+/** Any other CSS value (font stack, keyword, tracking), vetted; else fallback. */
+const val = (v: string | undefined, fallback: string): string =>
+  has(v) ? (sanitizeStyleValue(v) ?? fallback) : fallback;
+
 /**
- * Generate the stylesheet for a rendered resume from a {@link Theme}. Theme
- * values become CSS custom properties so they can be overridden at runtime,
- * and every theme color is exposed as `--retex-color-<token>` for use by
- * `\themecolor`.
+ * Generate the stylesheet for a rendered resume from a {@link Theme}.
+ *
+ * Themes are **blank by default**: any field may be `undefined`. The structural
+ * layout (flex rows, list indents, spacing rhythm) is always emitted, while all
+ * *decoration* (accent colors, fonts, uppercased headings, skill chips, section
+ * rules) is driven by CSS custom properties whose fallbacks are neutral. So an
+ * unstyled theme produces a clean, browser-default document, and importing a
+ * library/theme simply fills in those variables.
+ *
+ * Every embedded theme value is vetted before it reaches the stylesheet
+ * (`isSafeColor` / `isSafeDimension` / `sanitizeStyleValue`), so even a
+ * user-supplied theme cannot inject CSS. Each color is also exposed as
+ * `--retex-color-<token>` for use by `\themecolor`.
  */
 export function themeToCss(theme: Theme, prefix = "retex"): string {
   const p = prefix;
-  const colorVars = Object.entries(theme.colors)
+  const c = theme.colors ?? {};
+  const f = theme.fonts ?? {};
+  const fs = theme.fontSizes ?? {};
+  const sp = theme.spacing ?? {};
+  const h = theme.headings ?? {};
+
+  // Per-token color variables (only emit the ones that are defined *and* safe).
+  const colorVars = Object.entries(c)
+    .filter(([, v]) => has(v) && isSafeColor(v))
     .map(([k, v]) => `    --${p}-color-${tokenSafe(k)}: ${v};`)
     .join("\n");
 
+  // Resolved, vetted decoration values — neutral when the theme is blank.
+  const primary = color(c.primary, "");
+  const skillBg = primary
+    ? `color-mix(in srgb, ${primary} 12%, transparent)`
+    : "transparent";
+  const skillColor = primary || "inherit";
+  const linkDecoration = primary ? "none" : "underline";
+
   return `.${p}-resume {
-${colorVars}
-    --${p}-primary: ${theme.colors.primary};
-    --${p}-text: ${theme.colors.text};
-    --${p}-muted: ${theme.colors.muted};
-    --${p}-border: ${theme.colors.border};
-    --${p}-bg: ${theme.colors.background};
-    --${p}-font-heading: ${theme.fonts.heading};
-    --${p}-font-body: ${theme.fonts.body};
-    --${p}-font-mono: ${theme.fonts.mono};
-    --${p}-fs-base: ${theme.fontSizes.base};
-    --${p}-fs-small: ${theme.fontSizes.small};
-    --${p}-fs-large: ${theme.fontSizes.large};
-    --${p}-fs-Large: ${theme.fontSizes.Large};
-    --${p}-fs-Huge: ${theme.fontSizes.Huge};
-    --${p}-fs-name: ${theme.fontSizes.name};
-    --${p}-fs-section: ${theme.fontSizes.section};
-    --${p}-sp-section: ${theme.spacing.section};
-    --${p}-sp-item: ${theme.spacing.item};
+${colorVars ? colorVars + "\n" : ""}    --${p}-primary: ${primary || "inherit"};
+    --${p}-text: ${color(c.text, "inherit")};
+    --${p}-muted: ${color(c.muted, "inherit")};
+    --${p}-border: ${color(c.border, "currentColor")};
+    --${p}-bg: ${color(c.background, "transparent")};
+    --${p}-font-heading: ${val(f.heading, "inherit")};
+    --${p}-font-body: ${val(f.body, "inherit")};
+    --${p}-font-mono: ${val(f.mono, "ui-monospace, SFMono-Regular, Menlo, monospace")};
+    --${p}-fs-base: ${dim(fs.base, "inherit")};
+    --${p}-fs-small: ${dim(fs.small, "0.85em")};
+    --${p}-fs-large: ${dim(fs.large, "1.2em")};
+    --${p}-fs-Large: ${dim(fs.Large, "1.45em")};
+    --${p}-fs-Huge: ${dim(fs.Huge, "2em")};
+    --${p}-fs-name: ${dim(fs.name, "2em")};
+    --${p}-fs-section: ${dim(fs.section, "1.25em")};
+    --${p}-sp-section: ${dim(sp.section, "1.1rem")};
+    --${p}-sp-item: ${dim(sp.item, "0.28rem")};
+    --${p}-section-transform: ${val(h.transform, "none")};
+    --${p}-section-tracking: ${val(h.tracking, "normal")};
+    --${p}-name-tracking: ${val(h.nameTracking, "normal")};
+    --${p}-link-decoration: ${linkDecoration};
+    --${p}-skill-bg: ${skillBg};
+    --${p}-skill-color: ${skillColor};
 
     box-sizing: border-box;
-    max-width: ${theme.page.maxWidth};
+    max-width: ${dim(theme.page?.maxWidth, "none")};
     margin: 0 auto;
-    padding: ${theme.spacing.page};
+    padding: ${dim(sp.page, "0")};
     background: var(--${p}-bg);
     color: var(--${p}-text);
     font-family: var(--${p}-font-body);
@@ -53,7 +102,7 @@ ${colorVars}
     font-weight: 700;
     margin: 0 0 0.1em;
     color: var(--${p}-text);
-    letter-spacing: -0.01em;
+    letter-spacing: var(--${p}-name-tracking);
 }
 .${p}-title {
     font-size: var(--${p}-fs-large);
@@ -82,8 +131,8 @@ ${colorVars}
     font-family: var(--${p}-font-heading);
     font-size: var(--${p}-fs-section);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    text-transform: var(--${p}-section-transform);
+    letter-spacing: var(--${p}-section-tracking);
     color: var(--${p}-primary);
     margin: 0 0 0.5em;
 }
@@ -126,8 +175,8 @@ ${colorVars}
 
 .${p}-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.2rem 0; padding: 0; }
 .${p}-skill {
-    background: color-mix(in srgb, var(--${p}-primary) 12%, transparent);
-    color: var(--${p}-primary);
+    background: var(--${p}-skill-bg);
+    color: var(--${p}-skill-color);
     border-radius: 4px;
     padding: 0.12rem 0.5rem;
     font-size: var(--${p}-fs-small);
@@ -135,10 +184,14 @@ ${colorVars}
     white-space: nowrap;
 }
 
-.${p}-link { color: var(--${p}-primary); text-decoration: none; }
+.${p}-link { color: var(--${p}-primary); text-decoration: var(--${p}-link-decoration); }
 .${p}-link:hover { text-decoration: underline; }
 .${p}-icon { display: inline-flex; vertical-align: -0.125em; }
 .${p}-rule { border: none; border-top: 1px solid var(--${p}-border); margin: 0.6rem 0; }
+.${p}-rule--dashed { border-top-style: dashed; }
+.${p}-rule--dotted { border-top-style: dotted; }
+.${p}-rule--thick { border-top-width: 3px; }
+.${p}-rule--double { border-top-style: double; border-top-width: 3px; }
 .${p}-center { text-align: center; }
 .${p}-scale-small { font-size: var(--${p}-fs-small); }
 .${p}-scale-large { font-size: var(--${p}-fs-large); }

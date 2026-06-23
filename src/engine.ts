@@ -12,7 +12,18 @@ import { CommandRegistry } from "./parser/registry.js";
 import { createDefaultRegistry } from "./parser/builtins.js";
 import { validate } from "./validator/index.js";
 import { resolveTheme } from "./theme/themes.js";
+import { defaultTheme } from "./theme/default.js";
 import { registerIcon, type IconDefinition } from "./icons/icons.js";
+import {
+  applyLibraries,
+  mergeLibraryTheme,
+  collectLibraryOverrides,
+  libraryDiagnostics,
+  getBuiltinLibrary,
+  usedLibraryNamesFromTokens,
+  usedLibraryNamesFromAst,
+  type ReTeXLibrary,
+} from "./library/index.js";
 import {
   HtmlRenderer,
   renderJson,
@@ -34,6 +45,12 @@ import type { EngineCommand, ReTeXPlugin, PluginHost } from "./plugin/types.js";
 export interface EngineOptions {
   theme?: Theme | PartialTheme;
   plugins?: ReTeXPlugin[];
+  /**
+   * Libraries to make available to `\usepackage` *without* activating them
+   * globally. Built-in libraries (`fonts`, `shapes`, `colors`, `modern`, …) are
+   * always available; use this to register your own.
+   */
+  libraries?: ReTeXLibrary[];
   classPrefix?: string;
   /** Max number of compiled documents to cache. Default 64. */
   cacheSize?: number;
@@ -51,18 +68,29 @@ export interface CompileOptions {
   validate?: boolean;
 }
 
-const isTheme = (t: Theme | PartialTheme | undefined): t is Theme =>
-  !!t && "colors" in t && "fonts" in t && "fontSizes" in t && "page" in t;
+/** Per-document render inputs derived from the active engine + used libraries. */
+interface RenderBundle {
+  ast: DocumentNode;
+  theme: Theme;
+  htmlOverrides: Map<string, HtmlRenderFn>;
+  reactOverrides: Map<string, ReactRenderFn>;
+}
+
+/** A theme is "full" (replaces) rather than a patch (merges) when it is named. */
+const isFullTheme = (t: Theme | PartialTheme | undefined): t is Theme =>
+  typeof t?.name === "string" && t.name.length > 0;
 
 /**
  * The ReTeX engine: the single entry point that wires the tokenizer, parser,
- * validator, renderers, theming, plugins, and caching together.
+ * validator, renderers, theming, libraries, plugins, and caching together.
+ *
+ * ReTeX is blank by default. Styling is opt-in via **libraries**, activated
+ * either from the document (`\usepackage{colors}`) or from code
+ * (`engine.use(colorsLibrary)`).
  *
  * ```ts
- * const engine = new ReTeXEngine({ theme: { colors: { primary: "#7c3aed" } } });
- * engine.registerCommand({ name: "badge", args: [{ kind: "content" }],
- *   render: { html: (n, ctx, kids) => `<span class="badge">${kids((n as any).args[0].children)}</span>` } });
- * const html = engine.toHtml(source);
+ * const engine = new ReTeXEngine();
+ * engine.toHtml("\\usepackage{colors}\n\\textcolor{#7c3aed}{Hi}");
  * ```
  */
 export class ReTeXEngine implements PluginHost {
@@ -71,15 +99,19 @@ export class ReTeXEngine implements PluginHost {
   private readonly prefix: string;
   private readonly htmlOverrides = new Map<string, HtmlRenderFn>();
   private readonly reactOverrides = new Map<string, ReactRenderFn>();
+  /** Libraries available to `\usepackage` (built-ins are resolved separately). */
+  private readonly customLibraries = new Map<string, ReTeXLibrary>();
   private readonly cache = new Map<string, CompileResult>();
   private readonly cacheSize: number;
   private generation = 0;
 
   constructor(options: EngineOptions = {}) {
     this.registry = createDefaultRegistry();
-    this.theme = isTheme(options.theme) ? options.theme : resolveTheme(options.theme);
+    // Merge any provided theme over the blank default so sub-objects are defined.
+    this.theme = resolveTheme(options.theme);
     this.prefix = options.classPrefix ?? "retex";
     this.cacheSize = options.cacheSize ?? 64;
+    for (const lib of options.libraries ?? []) this.provideLibrary(lib);
     for (const plugin of options.plugins ?? []) this.use(plugin);
   }
 
@@ -98,7 +130,20 @@ export class ReTeXEngine implements PluginHost {
       this.registerReactRenderer(key, fn);
     }
     if (plugin.theme) this.setTheme(plugin.theme);
+    // A named plugin is also addressable as a library via \usepackage{name}.
+    if (plugin.name) this.customLibraries.set(plugin.name.trim().toLowerCase(), plugin);
     plugin.setup?.(this);
+    this.invalidate();
+    return this;
+  }
+
+  /**
+   * Register a library so it can be activated with `\usepackage{name}`, without
+   * installing it globally. Built-in libraries are always available; use this
+   * for custom ones.
+   */
+  provideLibrary(library: ReTeXLibrary): this {
+    this.customLibraries.set(library.name.trim().toLowerCase(), library);
     this.invalidate();
     return this;
   }
@@ -136,7 +181,11 @@ export class ReTeXEngine implements PluginHost {
   /* ----------------------------- theming ------------------------------ */
 
   setTheme(theme: Theme | PartialTheme): this {
-    this.theme = isTheme(theme) ? theme : resolveTheme(theme, this.theme);
+    // A named theme replaces (merged over blank); an anonymous patch merges
+    // over the current theme.
+    this.theme = isFullTheme(theme)
+      ? resolveTheme(theme, defaultTheme)
+      : resolveTheme(theme, this.theme);
     this.invalidate();
     return this;
   }
@@ -163,11 +212,25 @@ export class ReTeXEngine implements PluginHost {
     if (cached) return cached;
 
     const { tokens, diagnostics: lexDiags } = tokenize(source);
-    const { ast, diagnostics: parseDiags } = new Parser(tokens, {
-      registry: this.registry,
-    }).parse();
-    const diagnostics = [...lexDiags, ...parseDiags];
-    if (runValidate) diagnostics.push(...validate(ast, { theme: this.theme }));
+
+    // Determine which libraries the document imports, then parse with a registry
+    // that includes their commands (so `\usepackage{colors}` enables \textcolor).
+    const usedNames = usedLibraryNamesFromTokens(tokens);
+    const { registry, libraries } = applyLibraries(
+      this.registry,
+      usedNames,
+      (n) => this.lookupLibrary(n),
+    );
+
+    const { ast, diagnostics: parseDiags } = new Parser(tokens, { registry }).parse();
+    let diagnostics = libraryDiagnostics(ast, [...lexDiags, ...parseDiags], (n) =>
+      this.lookupLibrary(n),
+    );
+
+    if (runValidate) {
+      const theme = mergeLibraryTheme(this.theme, libraries);
+      diagnostics.push(...validate(ast, { theme }));
+    }
 
     const result: CompileResult = { source, tokens, ast, diagnostics };
     this.remember(key, result);
@@ -180,32 +243,45 @@ export class ReTeXEngine implements PluginHost {
 
   validate(input: string | DocumentNode): Diagnostic[] {
     if (typeof input === "string") return this.compile(input).diagnostics;
-    return validate(input, { theme: this.theme });
+    return validate(input, { theme: this.bundle(input).theme });
   }
 
   /* ----------------------------- renderers ---------------------------- */
 
   toHtml(input: string | DocumentNode, options: HtmlRenderOptions = {}): string {
-    return this.htmlRenderer(options).render(this.astOf(input));
+    const b = this.bundle(input);
+    return new HtmlRenderer({
+      theme: b.theme,
+      classPrefix: this.prefix,
+      overrides: b.htmlOverrides,
+      ...options,
+    }).render(b.ast);
   }
 
   toHtmlDocument(
     input: string | DocumentNode,
     options: HtmlRenderOptions & { title?: string } = {},
   ): string {
-    return this.htmlRenderer(options).renderDocument(this.astOf(input), options.title);
+    const b = this.bundle(input);
+    return new HtmlRenderer({
+      theme: b.theme,
+      classPrefix: this.prefix,
+      overrides: b.htmlOverrides,
+      ...options,
+    }).renderDocument(b.ast, options.title);
   }
 
   toReact(
     input: string | DocumentNode,
     options: Omit<ReactRenderOptions, "theme" | "classPrefix" | "overrides">,
   ): unknown {
+    const b = this.bundle(input);
     return new ReactRenderer({
       ...options,
-      theme: this.theme,
+      theme: b.theme,
       classPrefix: this.prefix,
-      overrides: this.reactOverrides,
-    }).render(this.astOf(input));
+      overrides: b.reactOverrides,
+    }).render(b.ast);
   }
 
   toJson(input: string | DocumentNode, options?: JsonRenderOptions): string {
@@ -213,19 +289,41 @@ export class ReTeXEngine implements PluginHost {
   }
 
   toPrintHtml(input: string | DocumentNode, options: PrintOptions = {}): string {
-    return renderPrintHtml(this.astOf(input), this.printOptions(options));
+    const b = this.bundle(input);
+    return renderPrintHtml(b.ast, {
+      theme: b.theme,
+      classPrefix: this.prefix,
+      overrides: b.htmlOverrides,
+      ...options,
+    });
   }
 
   toPdf(input: string | DocumentNode, options: PdfOptions = {}): Promise<Uint8Array> {
-    return renderPdf(this.astOf(input), this.printOptions(options));
+    const b = this.bundle(input);
+    return renderPdf(b.ast, {
+      theme: b.theme,
+      classPrefix: this.prefix,
+      overrides: b.htmlOverrides,
+      ...options,
+    });
   }
 
-  /** The CSS stylesheet for the active theme. */
-  styles(): string {
-    return this.htmlRenderer().styles();
+  /**
+   * The CSS stylesheet for the active theme. Pass the document (source or AST)
+   * to fold in any libraries it imports via `\usepackage` (so the styles match
+   * `toHtml(input)`); omit it to get the engine theme's stylesheet.
+   */
+  styles(input?: string | DocumentNode): string {
+    const theme = input === undefined ? this.theme : this.bundle(input).theme;
+    return new HtmlRenderer({ theme, classPrefix: this.prefix }).styles();
   }
 
   /* ------------------------------ internals --------------------------- */
+
+  /** Resolve a library name against custom libraries first, then built-ins. */
+  private lookupLibrary(name: string): ReTeXLibrary | undefined {
+    return this.customLibraries.get(name.trim().toLowerCase()) ?? getBuiltinLibrary(name);
+  }
 
   private astOf(input: string | DocumentNode): DocumentNode {
     return typeof input === "string"
@@ -233,21 +331,31 @@ export class ReTeXEngine implements PluginHost {
       : input;
   }
 
-  private htmlRenderer(options: HtmlRenderOptions = {}): HtmlRenderer {
-    return new HtmlRenderer({
-      theme: this.theme,
-      classPrefix: this.prefix,
-      overrides: this.htmlOverrides,
-      ...options,
-    });
-  }
-
-  private printOptions<T extends PrintOptions>(options: T): T {
+  /**
+   * Build the per-document render inputs: the AST, the effective theme (engine
+   * theme + any libraries the document imports), and the merged render
+   * overrides. Library use is recovered from `\usepackage` nodes in the AST, so
+   * this works whether the input was a source string or a pre-parsed document.
+   */
+  private bundle(input: string | DocumentNode): RenderBundle {
+    const ast = this.astOf(input);
+    const libraries = usedLibraryNamesFromAst(ast)
+      .map((n) => this.lookupLibrary(n))
+      .filter((l): l is ReTeXLibrary => !!l);
+    if (libraries.length === 0) {
+      return {
+        ast,
+        theme: this.theme,
+        htmlOverrides: this.htmlOverrides,
+        reactOverrides: this.reactOverrides,
+      };
+    }
+    const { html, react } = collectLibraryOverrides(libraries);
     return {
-      theme: this.theme,
-      classPrefix: this.prefix,
-      overrides: this.htmlOverrides,
-      ...options,
+      ast,
+      theme: mergeLibraryTheme(this.theme, libraries),
+      htmlOverrides: new Map([...this.htmlOverrides, ...html]),
+      reactOverrides: new Map([...this.reactOverrides, ...react]),
     };
   }
 

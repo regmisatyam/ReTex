@@ -13,10 +13,16 @@ import type {
 import { DiagnosticSeverity, DiagnosticCode } from "../types/diagnostics.js";
 import { CommandRegistry } from "./registry.js";
 import { parseKeyValArg, parseListArg } from "./args.js";
-import { isSafeColor, isSafeDimension } from "../security/sanitize.js";
 import { hasIcon } from "../icons/icons.js";
 
 /* ----------------------------- typography ----------------------------- */
+/*
+ * The core ships only structural markup and *basic* text emphasis. Decorative
+ * typography is opt-in via libraries: color (`\textcolor`, `\themecolor`) lives
+ * in the `colors` library; font changes (`\fontfamily`, `\fontsize`, size
+ * switches, `\ttfamily`) live in the `fonts` library. Import them with
+ * `\usepackage{...}` or `engine.use(...)`. See `src/library`.
+ */
 
 const mark = (
   name: string,
@@ -31,18 +37,6 @@ const mark = (
   build: ({ args }) => ({ type, children: args[0]?.children ?? [] }) as Node,
 });
 
-const scaleSwitch = (
-  name: string,
-  scale: "small" | "large" | "Large" | "Huge",
-): CommandDefinition => ({
-  name,
-  category: "switch",
-  scoped: true,
-  summary: `Set the font size to "${name}" for the rest of the group.`,
-  example: `{\\${name} ...}`,
-  build: ({ scope }) => ({ type: "fontscale", scale, children: scope }),
-});
-
 const TYPOGRAPHY: CommandDefinition[] = [
   mark("textbf", "bold", "Bold text."),
   mark("textit", "italic", "Italic text."),
@@ -50,100 +44,6 @@ const TYPOGRAPHY: CommandDefinition[] = [
   mark("underline", "underline", "Underlined text."),
   mark("sout", "strike", "Struck-through text."),
 
-  {
-    name: "textcolor",
-    category: "inline",
-    args: [
-      { kind: "string", name: "color", format: "color" },
-      { kind: "content", name: "content" },
-    ],
-    summary: "Color text with a hex/named color.",
-    example: "\\textcolor{#2563eb}{OpenAI}",
-    build: ({ args, utils, report }) => {
-      const color = utils.textOf(args[0]).trim();
-      if (color && !isSafeColor(color)) {
-        report({
-          severity: DiagnosticSeverity.Warning,
-          code: DiagnosticCode.InvalidColor,
-          message: `"${color}" is not a recognized color; it will be ignored.`,
-          range: args[0]?.range ?? ZERO_RANGE,
-        });
-      }
-      return {
-        type: "color",
-        color: isSafeColor(color) ? color : "",
-        children: args[1]?.children ?? [],
-      };
-    },
-  },
-  {
-    name: "fontsize",
-    category: "inline",
-    args: [
-      { kind: "string", name: "size", format: "dimension" },
-      { kind: "content", name: "content" },
-    ],
-    summary: "Set an explicit font size for the wrapped content.",
-    example: "\\fontsize{14pt}{Custom Size}",
-    build: ({ args, utils, report }) => {
-      const size = utils.textOf(args[0]).trim();
-      if (size && !isSafeDimension(size)) {
-        report({
-          severity: DiagnosticSeverity.Warning,
-          code: DiagnosticCode.InvalidDimension,
-          message: `"${size}" is not a valid dimension.`,
-          range: args[0]?.range ?? ZERO_RANGE,
-        });
-      }
-      return {
-        type: "fontsize",
-        size: isSafeDimension(size) ? size : "1em",
-        children: args[1]?.children ?? [],
-      };
-    },
-  },
-  {
-    name: "fontfamily",
-    category: "inline",
-    args: [
-      { kind: "string", name: "family" },
-      { kind: "content", name: "content" },
-    ],
-    summary: "Set the font family for the wrapped content.",
-    example: "\\fontfamily{Georgia}{Serif text}",
-    build: ({ args, utils }) => ({
-      type: "fontfamily",
-      family: utils.textOf(args[0]).trim() || "inherit",
-      children: args[1]?.children ?? [],
-    }),
-  },
-  {
-    name: "themecolor",
-    category: "inline",
-    args: [
-      { kind: "string", name: "token" },
-      { kind: "content", name: "content" },
-    ],
-    summary: "Color text using a token from the active theme.",
-    example: "\\themecolor{primary}{Highlighted}",
-    build: ({ args, utils }) => ({
-      type: "themecolor",
-      token: utils.textOf(args[0]).trim() || "primary",
-      children: args[1]?.children ?? [],
-    }),
-  },
-
-  scaleSwitch("small", "small"),
-  scaleSwitch("large", "large"),
-  scaleSwitch("Large", "Large"),
-  scaleSwitch("Huge", "Huge"),
-  {
-    name: "normalsize",
-    category: "switch",
-    scoped: true,
-    summary: "Reset the font size to the document base size.",
-    build: ({ scope }) => ({ type: "fontscale", scale: "normal", children: scope }),
-  },
   {
     name: "bfseries",
     category: "switch",
@@ -158,15 +58,35 @@ const TYPOGRAPHY: CommandDefinition[] = [
     summary: "Switch to italic for the rest of the group.",
     build: ({ scope }) => ({ type: "italic", children: scope }),
   },
+];
+
+/* ------------------------------ directives ---------------------------- */
+
+const DIRECTIVES: CommandDefinition[] = [
   {
-    name: "ttfamily",
-    category: "switch",
-    scoped: true,
-    summary: "Switch to a monospace font for the rest of the group.",
-    build: ({ scope }) => ({
-      type: "fontfamily",
-      family: "monospace",
-      children: scope,
+    name: "usepackage",
+    category: "meta",
+    args: [{ kind: "list", name: "libraries" }],
+    summary: "Import styling libraries (fonts, shapes, colors, modern, …).",
+    documentation:
+      "ReTeX is blank by default. `\\usepackage{...}` activates one or more " +
+      "libraries for this document so their commands and styling become " +
+      "available. Multiple libraries can be comma-separated.",
+    example: "\\usepackage{shapes, colors}",
+    build: ({ args }) => ({
+      type: "usepackage",
+      names: parseListArg(args[0]?.raw ?? ""),
+    }),
+  },
+  {
+    name: "use",
+    category: "meta",
+    args: [{ kind: "list", name: "libraries" }],
+    summary: "Alias for \\usepackage — import styling libraries.",
+    example: "\\use{fonts}",
+    build: ({ args }) => ({
+      type: "usepackage",
+      names: parseListArg(args[0]?.raw ?? ""),
     }),
   },
 ];
@@ -366,6 +286,10 @@ const ICONS: CommandDefinition[] = [
 ];
 
 /* ------------------------------ primitives ---------------------------- */
+/*
+ * Horizontal rules (`\hrule`, `\divider`) and explicit spacing (`\vspace`,
+ * `\hspace`) are "shapes" — they live in the `shapes` library, not the core.
+ */
 
 const PRIMITIVES: CommandDefinition[] = [
   {
@@ -379,42 +303,6 @@ const PRIMITIVES: CommandDefinition[] = [
     category: "inline",
     summary: "An explicit line break.",
     build: () => ({ type: "linebreak" }),
-  },
-  {
-    name: "hrule",
-    category: "block",
-    summary: "A horizontal rule / divider.",
-    build: () => ({ type: "rule" }),
-  },
-  {
-    name: "divider",
-    category: "block",
-    summary: "A horizontal rule / divider.",
-    build: () => ({ type: "rule" }),
-  },
-  {
-    name: "vspace",
-    category: "block",
-    args: [{ kind: "string", name: "size", format: "dimension" }],
-    summary: "Vertical space.",
-    example: "\\vspace{1em}",
-    build: ({ args, utils }) => ({
-      type: "space",
-      axis: "vertical",
-      size: utils.textOf(args[0]).trim() || "1em",
-    }),
-  },
-  {
-    name: "hspace",
-    category: "inline",
-    args: [{ kind: "string", name: "size", format: "dimension" }],
-    summary: "Horizontal space.",
-    example: "\\hspace{1em}",
-    build: ({ args, utils }) => ({
-      type: "space",
-      axis: "horizontal",
-      size: utils.textOf(args[0]).trim() || "1em",
-    }),
   },
   // `\item` and `\column` are consumed by their environments; they are
   // registered so they are recognized (and so the validator can flag misuse
@@ -518,14 +406,19 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
 ];
 
 /**
- * Register every built-in command and environment into a fresh registry.
- * The engine calls this once per instance so plugins can extend a private
- * copy without touching global state.
+ * Register every built-in (core) command and environment into a fresh registry.
+ * The core is intentionally minimal: document structure, basic emphasis, links,
+ * sections, entries, icons, and the `\usepackage` directive. Visual styling
+ * (color, fonts, shapes) is added by libraries — see `src/library`.
+ *
+ * The engine calls this once per instance so plugins/libraries can extend a
+ * private copy without touching global state.
  */
 export function createDefaultRegistry(): CommandRegistry {
   const registry = new CommandRegistry();
   for (const def of [
     ...TYPOGRAPHY,
+    ...DIRECTIVES,
     ...LINKS,
     ...SECTIONS,
     ...CONTACT,

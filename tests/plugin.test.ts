@@ -61,7 +61,7 @@ describe("plugin system", () => {
       theme: { colors: { primary: "#7c3aed" } },
     };
     const engine = new ReTeXEngine().use(purple);
-    expect(engine.getTheme().colors.primary).toBe("#7c3aed");
+    expect(engine.getTheme().colors?.primary).toBe("#7c3aed");
   });
 
   it("invalidates the cache when a plugin is added", () => {

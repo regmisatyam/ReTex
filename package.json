@@ -1,6 +1,6 @@
 {
   "name": "@regmisatyam/retex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ReTeX — a modern, high-performance LaTeX-inspired markup language and compiler for resumes, research papers, and developer portfolios.",
   "keywords": [
     "resume",
@@ -44,6 +44,11 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
       "require": "./dist/react.cjs"
+    },
+    "./library": {
+      "types": "./dist/library.d.ts",
+      "import": "./dist/library.js",
+      "require": "./dist/library.cjs"
     }
   },
   "files": [

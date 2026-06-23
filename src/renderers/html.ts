@@ -53,7 +53,8 @@ export class HtmlRenderer {
   private readonly ctx: HtmlRenderContext;
 
   constructor(options: HtmlRenderOptions = {}) {
-    this.theme = options.theme ?? resolveTheme();
+    // Normalize so every theme sub-object is defined (the theme may be blank).
+    this.theme = resolveTheme(options.theme);
     this.prefix = options.classPrefix ?? "retex";
     this.overrides = options.overrides ?? new Map();
     this.useHeader = options.header ?? true;
@@ -109,7 +110,9 @@ export class HtmlRenderer {
   /* --------------------------- structuring ---------------------------- */
 
   private renderSection(section: SectionNode, body: Node[]): string {
-    const styleMod = ` ${this.cls("section")}--${this.theme.sectionStyle}`;
+    const styleMod = this.theme.sectionStyle
+      ? ` ${this.cls("section")}--${this.theme.sectionStyle}`
+      : "";
     return (
       `<section class="${this.cls("section")}${styleMod}"${this.src(section)}>` +
       `<h2 class="${this.cls("section-title")}"${this.src(section, "section-title")}>${escapeHtml(section.title)}</h2>` +
@@ -231,10 +234,18 @@ export class HtmlRenderer {
         return escapeHtml(node.value);
       case "parbreak":
         return "";
+      case "usepackage":
+        // A preamble directive — no visible output.
+        return "";
       case "linebreak":
         return "<br>";
-      case "rule":
-        return `<hr class="${this.cls("rule")}"${this.src(node)}>`;
+      case "rule": {
+        const variant =
+          node.style && node.style !== "solid"
+            ? ` ${this.cls(`rule--${node.style}`)}`
+            : "";
+        return `<hr class="${this.cls("rule")}${variant}"${this.src(node)}>`;
+      }
       case "space":
         return node.axis === "vertical"
           ? `<div style="height:${this.dim(node.size)}"${this.src(node)}></div>`

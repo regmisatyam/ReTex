@@ -36,6 +36,8 @@ export enum DiagnosticCode {
   CommandOutsideContext = "RTX4001",
   UnknownIcon = "RTX4002",
   UnknownThemeColor = "RTX4003",
+  UnknownLibrary = "RTX4004",
+  LibraryRequired = "RTX4005",
 
   UnsafeUrlBlocked = "RTX5001",
 }

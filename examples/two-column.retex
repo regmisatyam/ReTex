@@ -1,5 +1,8 @@
 %% ReTeX example — a two-column developer portfolio using \begin{columns}.
 
+%% The `compact` theme pack adds a dense styled look plus \themecolor, \small, etc.
+\usepackage{compact}
+
 \name{Sam Builder}
 \title{Full-Stack Developer & Designer}
 

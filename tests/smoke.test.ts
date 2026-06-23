@@ -1,10 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { tokenize } from "../src/tokenizer/index.js";
-import { parse } from "../src/parser/index.js";
+import { parse, createDefaultRegistry } from "../src/parser/index.js";
+import { applyLibraries } from "../src/index.js";
 
+// Styling commands live in libraries; enable them for these smoke tests.
+const registry = applyLibraries(createDefaultRegistry(), [
+  "colors",
+  "fonts",
+  "shapes",
+]).registry;
 const compile = (src: string) => {
   const { tokens } = tokenize(src);
-  return parse(tokens);
+  return parse(tokens, { registry });
 };
 
 describe("smoke", () => {

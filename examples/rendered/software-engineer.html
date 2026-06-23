@@ -6,16 +6,15 @@
 <title>software-engineer</title>
 <style>
 .retex-resume {
-    --retex-color-primary: #2563eb;
+    --retex-color-primary: #7c3aed;
     --retex-color-secondary: #64748b;
-    --retex-color-text: #1e293b;
+    --retex-color-text: #111827;
     --retex-color-muted: #64748b;
     --retex-color-background: #ffffff;
     --retex-color-border: #e2e8f0;
-    --retex-color-accent: #2563eb;
-    --retex-color-success: #16a34a;
-    --retex-primary: #2563eb;
-    --retex-text: #1e293b;
+    --retex-color-accent: #7c3aed;
+    --retex-primary: #7c3aed;
+    --retex-text: #111827;
     --retex-muted: #64748b;
     --retex-border: #e2e8f0;
     --retex-bg: #ffffff;
@@ -31,6 +30,12 @@
     --retex-fs-section: 13pt;
     --retex-sp-section: 1.1rem;
     --retex-sp-item: 0.28rem;
+    --retex-section-transform: uppercase;
+    --retex-section-tracking: 0.06em;
+    --retex-name-tracking: -0.01em;
+    --retex-link-decoration: none;
+    --retex-skill-bg: color-mix(in srgb, #7c3aed 12%, transparent);
+    --retex-skill-color: #7c3aed;
 
     box-sizing: border-box;
     max-width: 8.5in;
@@ -51,7 +56,7 @@
     font-weight: 700;
     margin: 0 0 0.1em;
     color: var(--retex-text);
-    letter-spacing: -0.01em;
+    letter-spacing: var(--retex-name-tracking);
 }
 .retex-title {
     font-size: var(--retex-fs-large);
@@ -80,8 +85,8 @@
     font-family: var(--retex-font-heading);
     font-size: var(--retex-fs-section);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    text-transform: var(--retex-section-transform);
+    letter-spacing: var(--retex-section-tracking);
     color: var(--retex-primary);
     margin: 0 0 0.5em;
 }
@@ -124,8 +129,8 @@
 
 .retex-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.2rem 0; padding: 0; }
 .retex-skill {
-    background: color-mix(in srgb, var(--retex-primary) 12%, transparent);
-    color: var(--retex-primary);
+    background: var(--retex-skill-bg);
+    color: var(--retex-skill-color);
     border-radius: 4px;
     padding: 0.12rem 0.5rem;
     font-size: var(--retex-fs-small);
@@ -133,10 +138,14 @@
     white-space: nowrap;
 }
 
-.retex-link { color: var(--retex-primary); text-decoration: none; }
+.retex-link { color: var(--retex-primary); text-decoration: var(--retex-link-decoration); }
 .retex-link:hover { text-decoration: underline; }
 .retex-icon { display: inline-flex; vertical-align: -0.125em; }
 .retex-rule { border: none; border-top: 1px solid var(--retex-border); margin: 0.6rem 0; }
+.retex-rule--dashed { border-top-style: dashed; }
+.retex-rule--dotted { border-top-style: dotted; }
+.retex-rule--thick { border-top-width: 3px; }
+.retex-rule--double { border-top-style: double; border-top-width: 3px; }
 .retex-center { text-align: center; }
 .retex-scale-small { font-size: var(--retex-fs-small); }
 .retex-scale-large { font-size: var(--retex-fs-large); }
@@ -155,14 +164,14 @@ p.retex-para:last-child { margin-bottom: 0; }
 <body>
 <div class="retex-resume">
 <header class="retex-header"><h1 class="retex-name">Jane Doe</h1><p class="retex-title">Senior Software Engineer</p><div class="retex-contact"><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg></span><a class="retex-contact-item" href="mailto:jane@example.com"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg>jane@example.com</a><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .57 3.6 1 1 0 0 1-.25 1l-2.2 2.2Z"/></svg></span><a class="retex-contact-item" href="tel:+15550100192"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .57 3.6 1 1 0 0 1-.25 1l-2.2 2.2Z"/></svg>+1 (555) 010-0192</a><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg></span><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>San Francisco, CA</span><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-2c-2.9.6-3.5-1.3-3.5-1.3-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.3-.3-4.8-1.2-4.8-5.2 0-1.2.4-2.1 1-2.9-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1.1a9.6 9.6 0 0 1 5 0c1.9-1.4 2.8-1.1 2.8-1.1.6 1.4.2 2.4.1 2.7.7.8 1 1.7 1 2.9 0 4-2.5 4.9-4.8 5.2.4.3.7 1 .7 2v3c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg></span><span class="retex-contact-item"><a class="retex-link" href="https://github.com/janedoe" target="_blank" rel="noopener noreferrer">github.com/janedoe</a></span><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M20.5 2h-17A1.5 1.5 0 0 0 2 3.5v17A1.5 1.5 0 0 0 3.5 22h17a1.5 1.5 0 0 0 1.5-1.5v-17A1.5 1.5 0 0 0 20.5 2ZM8 19H5v-9h3v9ZM6.5 8.7A1.7 1.7 0 1 1 6.5 5.3a1.7 1.7 0 0 1 0 3.4ZM19 19h-3v-4.7c0-1.1 0-2.6-1.6-2.6s-1.8 1.2-1.8 2.5V19h-3v-9h2.9v1.2h.04a3.2 3.2 0 0 1 2.9-1.6c3.1 0 3.7 2 3.7 4.7V19Z"/></svg></span><span class="retex-contact-item"><a class="retex-link" href="https://linkedin.com/in/janedoe" target="_blank" rel="noopener noreferrer">in/janedoe</a></span></div></header>
-<section class="retex-section retex-section--rule"><h2 class="retex-section-title">Summary</h2><div class="retex-section-body"><p class="retex-para">Senior engineer with 8+ years building <strong>distributed systems</strong> and developer tooling. I care about <em>reliability</em>, clean APIs, and shipping things people actually use.</p></div></section>
-<section class="retex-section retex-section--rule"><h2 class="retex-section-title">Experience</h2><div class="retex-section-body"><div class="retex-entry retex-job"><div class="retex-entry-row"><span class="retex-entry-title">Staff Software Engineer</span><span class="retex-entry-dates">2023 – Present</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">OpenAI</span><span class="retex-entry-location">Remote</span></div><div class="retex-entry-body"><p class="retex-para">Led platform reliability for high-traffic inference services.</p>
+<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Summary</h2><div class="retex-section-body"><p class="retex-para">Senior engineer with 8+ years building <strong>distributed systems</strong> and developer tooling. I care about <em>reliability</em>, clean APIs, and shipping things people actually use.</p></div></section>
+<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Experience</h2><div class="retex-section-body"><div class="retex-entry retex-job"><div class="retex-entry-row"><span class="retex-entry-title">Staff Software Engineer</span><span class="retex-entry-dates">2023 – Present</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">OpenAI</span><span class="retex-entry-location">Remote</span></div><div class="retex-entry-body"><p class="retex-para">Led platform reliability for high-traffic inference services.</p>
 <ul class="retex-list"><li>Cut p99 latency by <strong>40%</strong> by redesigning the request scheduler.</li><li>Built an internal <span style="color:#2563eb">observability</span> platform used by 200+ engineers.</li><li>Mentored 6 engineers; 2 were promoted within a year.</li></ul></div></div>
 <div class="retex-entry retex-job"><div class="retex-entry-row"><span class="retex-entry-title">Senior Software Engineer</span><span class="retex-entry-dates">2019 – 2023</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">Stripe</span><span class="retex-entry-location">New York, NY</span></div><div class="retex-entry-body"><p class="retex-para">Owned the payments ledger pipeline processing billions of events per day.</p>
 <ul class="retex-list"><li>Migrated a monolith to event-driven services with zero downtime.</li><li>Reduced infra spend by $1.2M/year through autoscaling improvements.</li></ul></div></div></div></section>
-<section class="retex-section retex-section--rule"><h2 class="retex-section-title">Projects</h2><div class="retex-section-body"><div class="retex-entry retex-project"><div class="retex-entry-row"><span class="retex-entry-title"><a class="retex-link" href="https://github.com/janedoe/retex" target="_blank" rel="noopener noreferrer">ReTeX</a></span><span class="retex-entry-dates">2024 – Present</span></div><div class="retex-entry-body"><p class="retex-para">A modern, LaTeX-inspired resume compiler with HTML, React, and PDF renderers.</p></div></div></div></section>
-<section class="retex-section retex-section--rule"><h2 class="retex-section-title">Skills</h2><div class="retex-section-body"><ul class="retex-skills"><li class="retex-skill">TypeScript</li><li class="retex-skill">JavaScript</li><li class="retex-skill">Go</li><li class="retex-skill">Rust</li><li class="retex-skill">React</li><li class="retex-skill">Node.js</li><li class="retex-skill">PostgreSQL</li><li class="retex-skill">Kubernetes</li><li class="retex-skill">AWS</li><li class="retex-skill">GCP</li></ul></div></section>
-<section class="retex-section retex-section--rule"><h2 class="retex-section-title">Education</h2><div class="retex-section-body"><div class="retex-entry retex-education"><div class="retex-entry-row"><span class="retex-entry-title">Massachusetts Institute of Technology</span><span class="retex-entry-dates">2011 – 2015</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">B.S. Computer Science</span><span class="retex-entry-location">Cambridge, MA</span></div></div></div></section>
+<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Projects</h2><div class="retex-section-body"><div class="retex-entry retex-project"><div class="retex-entry-row"><span class="retex-entry-title"><a class="retex-link" href="https://github.com/janedoe/retex" target="_blank" rel="noopener noreferrer">ReTeX</a></span><span class="retex-entry-dates">2024 – Present</span></div><div class="retex-entry-body"><p class="retex-para">A modern, LaTeX-inspired resume compiler with HTML, React, and PDF renderers.</p></div></div></div></section>
+<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Skills</h2><div class="retex-section-body"><ul class="retex-skills"><li class="retex-skill">TypeScript</li><li class="retex-skill">JavaScript</li><li class="retex-skill">Go</li><li class="retex-skill">Rust</li><li class="retex-skill">React</li><li class="retex-skill">Node.js</li><li class="retex-skill">PostgreSQL</li><li class="retex-skill">Kubernetes</li><li class="retex-skill">AWS</li><li class="retex-skill">GCP</li></ul></div></section>
+<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Education</h2><div class="retex-section-body"><div class="retex-entry retex-education"><div class="retex-entry-row"><span class="retex-entry-title">Massachusetts Institute of Technology</span><span class="retex-entry-dates">2011 – 2015</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">B.S. Computer Science</span><span class="retex-entry-location">Cambridge, MA</span></div></div></div></section>
 </div>
 </body>
 </html>

@@ -90,6 +90,7 @@ export type {
 /* ------------------------------- theme ------------------------------- */
 export {
   defaultTheme,
+  blankTheme,
   resolveTheme,
   getTheme,
   themes,
@@ -97,6 +98,36 @@ export {
   classicTheme,
   compactTheme,
 } from "./theme/index.js";
+
+/* ------------------------------ libraries ---------------------------- */
+// ReTeX is blank by default; libraries add styling, opt-in via
+// `\usepackage{...}` in a document or `engine.use(...)` in code.
+export {
+  colorsLibrary,
+  colorCommands,
+  palettes,
+  fontsLibrary,
+  fontCommands,
+  fontStacks,
+  fontTheme,
+  shapesLibrary,
+  shapeCommands,
+  modernLibrary,
+  classicLibrary,
+  compactLibrary,
+  builtinLibraries,
+  builtinLibraryNames,
+  getBuiltinLibrary,
+  resolveLibraryName,
+  GATED_COMMANDS,
+  applyLibraries,
+  mergeLibraryTheme,
+  collectLibraryOverrides,
+  libraryDiagnostics,
+  usedLibraryNamesFromTokens,
+  usedLibraryNamesFromAst,
+} from "./library/index.js";
+export type { ReTeXLibrary, LibraryLookup, AppliedLibraries } from "./library/index.js";
 
 /* ------------------------------ plugins ------------------------------ */
 export { badgePlugin, ratingPlugin } from "./plugin/index.js";

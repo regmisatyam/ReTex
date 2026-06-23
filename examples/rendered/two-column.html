@@ -6,36 +6,41 @@
 <title>two-column</title>
 <style>
 .retex-resume {
-    --retex-color-primary: #7c3aed;
+    --retex-color-primary: #2563eb;
     --retex-color-secondary: #64748b;
-    --retex-color-text: #111827;
+    --retex-color-text: #1e293b;
     --retex-color-muted: #64748b;
     --retex-color-background: #ffffff;
     --retex-color-border: #e2e8f0;
-    --retex-color-accent: #7c3aed;
-    --retex-color-success: #16a34a;
-    --retex-primary: #7c3aed;
-    --retex-text: #111827;
+    --retex-color-accent: #2563eb;
+    --retex-primary: #2563eb;
+    --retex-text: #1e293b;
     --retex-muted: #64748b;
     --retex-border: #e2e8f0;
     --retex-bg: #ffffff;
     --retex-font-heading: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     --retex-font-body: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     --retex-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, monospace;
-    --retex-fs-base: 10.5pt;
-    --retex-fs-small: 9pt;
-    --retex-fs-large: 12pt;
-    --retex-fs-Large: 15pt;
-    --retex-fs-Huge: 22pt;
-    --retex-fs-name: 26pt;
-    --retex-fs-section: 13pt;
-    --retex-sp-section: 1.1rem;
-    --retex-sp-item: 0.28rem;
+    --retex-fs-base: 9.5pt;
+    --retex-fs-small: 8pt;
+    --retex-fs-large: 11pt;
+    --retex-fs-Large: 13pt;
+    --retex-fs-Huge: 18pt;
+    --retex-fs-name: 20pt;
+    --retex-fs-section: 11pt;
+    --retex-sp-section: 0.7rem;
+    --retex-sp-item: 0.18rem;
+    --retex-section-transform: uppercase;
+    --retex-section-tracking: 0.06em;
+    --retex-name-tracking: -0.01em;
+    --retex-link-decoration: none;
+    --retex-skill-bg: color-mix(in srgb, #2563eb 12%, transparent);
+    --retex-skill-color: #2563eb;
 
     box-sizing: border-box;
     max-width: 8.5in;
     margin: 0 auto;
-    padding: 0.55in;
+    padding: 0.4in;
     background: var(--retex-bg);
     color: var(--retex-text);
     font-family: var(--retex-font-body);
@@ -51,7 +56,7 @@
     font-weight: 700;
     margin: 0 0 0.1em;
     color: var(--retex-text);
-    letter-spacing: -0.01em;
+    letter-spacing: var(--retex-name-tracking);
 }
 .retex-title {
     font-size: var(--retex-fs-large);
@@ -80,8 +85,8 @@
     font-family: var(--retex-font-heading);
     font-size: var(--retex-fs-section);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    text-transform: var(--retex-section-transform);
+    letter-spacing: var(--retex-section-tracking);
     color: var(--retex-primary);
     margin: 0 0 0.5em;
 }
@@ -124,8 +129,8 @@
 
 .retex-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.2rem 0; padding: 0; }
 .retex-skill {
-    background: color-mix(in srgb, var(--retex-primary) 12%, transparent);
-    color: var(--retex-primary);
+    background: var(--retex-skill-bg);
+    color: var(--retex-skill-color);
     border-radius: 4px;
     padding: 0.12rem 0.5rem;
     font-size: var(--retex-fs-small);
@@ -133,10 +138,14 @@
     white-space: nowrap;
 }
 
-.retex-link { color: var(--retex-primary); text-decoration: none; }
+.retex-link { color: var(--retex-primary); text-decoration: var(--retex-link-decoration); }
 .retex-link:hover { text-decoration: underline; }
 .retex-icon { display: inline-flex; vertical-align: -0.125em; }
 .retex-rule { border: none; border-top: 1px solid var(--retex-border); margin: 0.6rem 0; }
+.retex-rule--dashed { border-top-style: dashed; }
+.retex-rule--dotted { border-top-style: dotted; }
+.retex-rule--thick { border-top-width: 3px; }
+.retex-rule--double { border-top-style: double; border-top-width: 3px; }
 .retex-center { text-align: center; }
 .retex-scale-small { font-size: var(--retex-fs-small); }
 .retex-scale-large { font-size: var(--retex-fs-large); }
@@ -155,7 +164,7 @@ p.retex-para:last-child { margin-bottom: 0; }
 <body>
 <div class="retex-resume">
 <header class="retex-header"><h1 class="retex-name">Sam Builder</h1><p class="retex-title">Full-Stack Developer &amp; Designer</p><div class="retex-contact"><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-2c-2.9.6-3.5-1.3-3.5-1.3-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.3-.3-4.8-1.2-4.8-5.2 0-1.2.4-2.1 1-2.9-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1.1a9.6 9.6 0 0 1 5 0c1.9-1.4 2.8-1.1 2.8-1.1.6 1.4.2 2.4.1 2.7.7.8 1 1.7 1 2.9 0 4-2.5 4.9-4.8 5.2.4.3.7 1 .7 2v3c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg></span><span class="retex-contact-item"><a class="retex-link" href="https://github.com/sambuilder" target="_blank" rel="noopener noreferrer">sambuilder</a></span><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.9a15.7 15.7 0 0 0-1.3-3.4A8 8 0 0 1 18.9 8ZM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4ZM4.3 14a8 8 0 0 1 0-4h3.3a17.6 17.6 0 0 0 0 4H4.3Zm.8 2h2.9a15.7 15.7 0 0 0 1.3 3.4A8 8 0 0 1 5.1 16Zm2.9-8H5.1a8 8 0 0 1 4.2-3.4A15.7 15.7 0 0 0 8 8Zm4 12c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4Zm2.3-6h-4.6a15.3 15.3 0 0 1 0-4h4.6a15.3 15.3 0 0 1 0 4Zm.4 5.4a15.7 15.7 0 0 0 1.3-3.4h2.9a8 8 0 0 1-4.2 3.4ZM16.4 14a17.6 17.6 0 0 0 0-4h3.3a8 8 0 0 1 0 4h-3.3Z"/></svg></span><a class="retex-contact-item" href="https://sambuilder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.9a15.7 15.7 0 0 0-1.3-3.4A8 8 0 0 1 18.9 8ZM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4ZM4.3 14a8 8 0 0 1 0-4h3.3a17.6 17.6 0 0 0 0 4H4.3Zm.8 2h2.9a15.7 15.7 0 0 0 1.3 3.4A8 8 0 0 1 5.1 16Zm2.9-8H5.1a8 8 0 0 1 4.2-3.4A15.7 15.7 0 0 0 8 8Zm4 12c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4Zm2.3-6h-4.6a15.3 15.3 0 0 1 0-4h4.6a15.3 15.3 0 0 1 0 4Zm.4 5.4a15.7 15.7 0 0 0 1.3-3.4h2.9a8 8 0 0 1-4.2 3.4ZM16.4 14a17.6 17.6 0 0 0 0-4h3.3a8 8 0 0 1 0 4h-3.3Z"/></svg>https://sambuilder.dev</a><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg></span><a class="retex-contact-item" href="mailto:sam@builder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg>sam@builder.dev</a></div></header>
-<section class="retex-section retex-section--underline"><h2 class="retex-section-title">Profile</h2><div class="retex-section-body"><p class="retex-para">Product-minded engineer who ships polished web apps end to end — from <span style="color:var(--retex-color-primary, currentColor)">design systems</span> to deploy pipelines.</p>
+<section class="retex-section retex-section--bar"><h2 class="retex-section-title">Profile</h2><div class="retex-section-body"><p class="retex-para">Product-minded engineer who ships polished web apps end to end — from <span style="color:var(--retex-color-primary, currentColor)">design systems</span> to deploy pipelines.</p>
 <div class="retex-columns"><div class="retex-column" style="flex:0 0 62%"><h2 class="retex-subsection-title">Experience</h2>
 <div class="retex-entry retex-job"><div class="retex-entry-row"><span class="retex-entry-title">Founding Engineer</span><span class="retex-entry-dates">2022 – Present</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">Tiny Startup</span></div><div class="retex-entry-body"><p class="retex-para">First engineering hire; built the product from zero to 30k users.</p>
 <ul class="retex-list"><li>Designed and shipped the entire web client in React.</li><li>Set up CI/CD, observability, and on-call from scratch.</li></ul></div></div>

@@ -11,6 +11,11 @@ LaTeX without the toolchain. You write a small, readable markup language; ReTeX
 tokenizes, parses, validates, and renders it to **HTML**, **React**, **JSON**, or
 **PDF** — all from a single, dependency-free TypeScript library.
 
+ReTeX is **blank by default** — a plain, unstyled document, "just simple
+editing". Styling is opt-in: import a **library** with `\usepackage{...}`
+(LaTeX-style) for colors, fonts, shapes, or a full themed look. Nothing is
+imposed; you add exactly what you want.
+
 ```latex
 \name{Ada Lovelace}
 \title{Software Engineer}
@@ -27,10 +32,11 @@ tokenizes, parses, validates, and renders it to **HTML**, **React**, **JSON**, o
 
 ## Preview
 
-The three [examples](examples/) rendered to HTML (default, modern, and classic
-themes). Regenerate with `npx tsx examples/build.ts`.
+The three [examples](examples/) rendered to HTML. Each opts into a theme pack
+with a single `\usepackage{...}` line (`modern`, `compact`, `classic`).
+Regenerate with `npx tsx examples/build.ts`.
 
-| Single column (`default`) | Two column (`modern`) | Academic CV (`classic`) |
+| Single column (`modern`) | Two column (`compact`) | Academic CV (`classic`) |
 | --- | --- | --- |
 | [![software engineer](examples/rendered/software-engineer.png)](examples/software-engineer.retex) | [![two column](examples/rendered/two-column.png)](examples/two-column.retex) | [![research paper](examples/rendered/research-paper.png)](examples/research-paper.retex) |
 
@@ -44,18 +50,29 @@ set of commands (`\name`, `\job`, `\education`, `\skills`, `\section`, …), str
 theming, and four production-ready renderers.
 
 ReTeX **is not** a full LaTeX implementation. There is no math mode, no macro
-programming, no package ecosystem, no `\def`. The syntax is *LaTeX-inspired* —
-familiar braces and backslash commands — but the language is deliberately small,
-safe, and predictable. (Notably, `%` is a literal percent sign, not a comment;
+programming, no `\def`. The syntax is *LaTeX-inspired* — familiar braces and
+backslash commands — but the language is deliberately small, safe, and
+predictable. (Notably, `%` is a literal percent sign, not a comment;
 see [Syntax](docs/SYNTAX.md).)
+
+It does, however, borrow LaTeX's best idea: **packages**. The core is blank, and
+you `\usepackage{...}` exactly the styling you need — `colors`, `fonts`,
+`shapes`, or a complete theme pack like `modern`. See [Libraries](#libraries).
 
 ---
 
 ## Features
 
-- **Typography** — `\textbf`, `\textit`, `\emph`, `\underline`, `\sout`,
-  `\textcolor`, `\fontsize`, `\fontfamily`, and scoped switches (`\small`,
-  `\large`, `\Large`, `\Huge`, `\bfseries`, `\itshape`, `\ttfamily`).
+- **Blank by default** — the core ships structure + basic emphasis; everything
+  decorative is opt-in. A document with no imports renders as a clean,
+  browser-default page.
+- **Core typography** — `\textbf`, `\textit`, `\emph`, `\underline`, `\sout`,
+  `\bfseries`, `\itshape`.
+- **Libraries (`\usepackage`)** — opt into styling, LaTeX-style: `colors`
+  (`\textcolor`, `\themecolor`), `fonts` (`\fontfamily`, `\fontsize`,
+  `\small`…`\Huge`, `\ttfamily`), `shapes` (`\hrule`, `\dashrule`, …, `\vspace`,
+  `\hspace`), and theme packs `modern` / `classic` / `compact`. Activate from the
+  document **or** from code (`engine.use(...)`).
 - **Hyperlinks** — `\href{url}{label}` and `\url{url}`, with URL sanitization.
 - **Sections** — `\section` and `\subsection`.
 - **Résumé components** — `\name`, `\title`, `\email`, `\phone`, `\location`,
@@ -64,8 +81,8 @@ see [Syntax](docs/SYNTAX.md).)
   environment.
 - **Icons** — inline SVG icon set (`\icon{github}`, `\icon{linkedin}`, …),
   extensible at runtime.
-- **Theming** — four presets (`default`, `modern`, `classic`, `compact`) plus a
-  fully data-driven, deep-mergeable custom theme model.
+- **Theming** — a blank default plus opt-in presets (`modern`, `classic`,
+  `compact`) and a fully data-driven, deep-mergeable custom theme model.
 - **Plugins** — register new commands, environments, icons, renderers, or theme
   patches on a per-engine basis. Two example plugins ship in the box
   (`badgePlugin`, `ratingPlugin`).
@@ -101,15 +118,19 @@ PDF export lazily imports `puppeteer` if present; otherwise you can supply your
 own headless-browser launcher (Playwright, a pooled Chromium, etc.) or print the
 generated HTML to PDF in the browser.
 
-The package exposes two entry points:
+The package exposes three entry points:
 
-| Import path                | Contents                                              |
-| -------------------------- | ----------------------------------------------------- |
-| `@regmisatyam/retex`       | The engine, pipeline, AST utilities, all renderers\*, theming, plugins, security, icons, editor, incremental compiler. |
-| `@regmisatyam/retex/react` | The React renderer (`ReactRenderer`, `renderReact`).  |
+| Import path                  | Contents                                              |
+| ---------------------------- | ----------------------------------------------------- |
+| `@regmisatyam/retex`         | The engine, pipeline, AST utilities, all renderers\*, theming, libraries\*\*, plugins, security, icons, editor, incremental compiler. |
+| `@regmisatyam/retex/react`   | The React renderer (`ReactRenderer`, `renderReact`).  |
+| `@regmisatyam/retex/library` | Just the libraries (`colorsLibrary`, `fontsLibrary`, …) and helpers. |
 
 \* The React renderer is also re-exported from `@regmisatyam/retex`, but lives behind
 `@regmisatyam/retex/react` so the core bundle never imports React.
+
+\*\* The libraries are also re-exported from `@regmisatyam/retex`; the
+`/library` subpath just lets you import them on their own.
 
 ---
 
@@ -144,11 +165,30 @@ const css = engine.styles();
 `engine.toHtml` accepts either a source string or a parsed `DocumentNode`, so you
 can parse once and render to several targets.
 
+That document renders as a clean, **unstyled** page. To add styling, import a
+library — from the source:
+
+```latex
+\usepackage{modern}        %% a full themed look + the color/font/shape commands
+\textcolor{#7c3aed}{Now in color}
+```
+
+…or from code:
+
+```ts
+import { ReTeXEngine, colorsLibrary, fontsLibrary } from "@regmisatyam/retex";
+const engine = new ReTeXEngine().use(colorsLibrary).use(fontsLibrary);
+```
+
+See [Libraries](#libraries) for the full catalog.
+
 ---
 
 ## A realistic résumé
 
 ```latex
+\usepackage{modern}   %% styled look + color/font/shape commands (e.g. \hspace below)
+
 %% --- header ---
 \name{Grace Hopper}
 \title{Distinguished Engineer \& Compiler Pioneer}
@@ -324,10 +364,52 @@ const pdf2 = await engine.toPdf(source, {
 
 ---
 
+## Libraries
+
+ReTeX is blank by default; **libraries** add styling, opt-in. Activate them two
+ways — and you can mix both.
+
+**From the document** (LaTeX-style, in the preamble):
+
+```latex
+\usepackage{colors}          %% \textcolor, \themecolor
+\usepackage{fonts, shapes}   %% comma-separate to import several at once
+\textcolor{#2563eb}{Now available} — \hrule
+```
+
+`\use{...}` is an alias. If you use a gated command without its library, ReTeX
+tells you exactly which `\usepackage{...}` to add.
+
+**From code** (great for app integrations):
+
+```ts
+import { ReTeXEngine, colorsLibrary, shapesLibrary } from "@regmisatyam/retex";
+
+const engine = new ReTeXEngine({ plugins: [colorsLibrary, shapesLibrary] });
+// or: new ReTeXEngine().use(colorsLibrary).use(shapesLibrary)
+engine.toHtml("\\textcolor{#2563eb}{Hi} \\hrule");
+```
+
+### Built-in libraries
+
+| Library                          | `\usepackage{…}` | Provides                                                                  |
+| -------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `colorsLibrary`                  | `colors`         | `\textcolor`, `\themecolor`, plus a `palettes` catalog                    |
+| `fontsLibrary`                   | `fonts`          | `\fontfamily`, `\fontsize`, `\small`…`\Huge`, `\normalsize`, `\ttfamily`, plus `fontStacks` / `fontTheme` |
+| `shapesLibrary`                  | `shapes`         | `\hrule`, `\divider`, `\dashrule`, `\dotrule`, `\thickrule`, `\doublerule`, `\vspace`, `\hspace` |
+| `modern` / `classic` / `compact` | same name        | A complete styled look **plus** all three toolkits above                  |
+
+Theme packs are the quickest path to a polished document: `\usepackage{modern}`
+gives you the full look *and* every styling command. Bring your own library with
+`engine.provideLibrary(myLib)` (addressable by `\usepackage`) or `engine.use`.
+
+---
+
 ## Theming
 
-Themes are plain data, deep-merged over the default. Pass a full `Theme` or a
-partial patch.
+Themes are plain data, deep-merged over the **blank** default — so every field is
+optional, and what you don't set stays unstyled. Pass a full `Theme` or a partial
+patch.
 
 ```ts
 import { ReTeXEngine, modernTheme } from "@regmisatyam/retex";
@@ -335,7 +417,7 @@ import { ReTeXEngine, modernTheme } from "@regmisatyam/retex";
 // Use a preset:
 const a = new ReTeXEngine({ theme: modernTheme });
 
-// Or a partial override (deep-merged over the default):
+// Or a partial override (deep-merged over blank):
 const b = new ReTeXEngine({
   theme: {
     name: "brand",
@@ -345,14 +427,16 @@ const b = new ReTeXEngine({
   },
 });
 
-// Swap at runtime:
+// Swap at runtime (an anonymous patch merges over the current theme):
 b.setTheme({ colors: { primary: "#059669" } });
 ```
 
-Presets: `defaultTheme`, `modernTheme`, `classicTheme`, `compactTheme` (also
-available by name via `getTheme("modern")` or the `themes` map). Every theme
-color is exposed as a CSS variable (`--retex-color-<token>`), usable from
-`\themecolor{token}{…}`.
+Presets: `blankTheme` (the default), `modernTheme`, `classicTheme`,
+`compactTheme` (also available by name via `getTheme("modern")` or the `themes`
+map). Every theme color is exposed as a CSS variable (`--retex-color-<token>`),
+usable from `\themecolor{token}{…}`. A blank theme still renders a readable
+document — the structural CSS is always emitted; only decoration is left to a
+theme/library.
 
 ---
 

@@ -5,14 +5,21 @@ command and environment, their argument signatures, and examples — plus the
 ReTeX-specific lexing rules that distinguish it from LaTeX.
 
 This document is the user-facing companion to the source of truth,
-`src/parser/builtins.ts`.
+`src/parser/builtins.ts` (the blank core) and `src/library/` (the libraries).
+
+> **ReTeX is blank by default.** The core ships document structure and basic
+> text emphasis only. Color, fonts, and shapes (rules/dividers/spacing) live in
+> **libraries** you import with `\usepackage{...}` — exactly like LaTeX
+> packages. Commands marked **🔌 _Library:_ `name`** below require that
+> library. See [Libraries & `\usepackage`](#libraries--usepackage).
 
 ---
 
 ## Table of contents
 
 - [Lexing rules](#lexing-rules)
-- [Typography](#typography)
+- [Libraries & `\usepackage`](#libraries--usepackage)
+- [Typography](#typography) — basic emphasis (core) + 🔌 color/fonts
 - [Hyperlinks](#hyperlinks)
 - [Sections](#sections)
 - [Résumé header / contact](#résumé-header--contact)
@@ -20,8 +27,8 @@ This document is the user-facing companion to the source of truth,
 - [Lists](#lists)
 - [Columns / layout](#columns--layout)
 - [Icons](#icons)
-- [Primitives](#primitives)
-- [Theme color](#theme-color)
+- [Primitives & shapes](#primitives--shapes) — 🔌 rules/dividers/spacing
+- [Theme color](#theme-color) — 🔌 `colors`
 
 ---
 
@@ -109,12 +116,14 @@ into) becomes a key with an empty-string value.
 
 ### Scoped font switches
 
-The switch commands `\small`, `\large`, `\Large`, `\Huge` (and `\normalsize`,
-`\bfseries`, `\itshape`, `\ttfamily`) are **scoped**: they apply to the rest of
-their enclosing `{ … }` group, exactly like LaTeX declarations. Wrap them in a
-group to bound their effect:
+Switch commands are **scoped**: they apply to the rest of their enclosing
+`{ … }` group, exactly like LaTeX declarations. `\bfseries` and `\itshape` are
+core; the size switches `\small`, `\large`, `\Large`, `\Huge`, `\normalsize` and
+`\ttfamily` live in the **`fonts`** library. Wrap a switch in a group to bound
+its effect:
 
 ```latex
+\usepackage{fonts}
 {\Large Ada Lovelace} — {\small Software Engineer}
 ```
 
@@ -123,7 +132,54 @@ Outside any group, a switch applies to the rest of the current content scope
 
 ---
 
+## Libraries & `\usepackage`
+
+ReTeX is **blank by default** — no colors, no fonts beyond the browser default,
+no rules. Styling is opt-in via **libraries**. Activate them two ways:
+
+- **From the document** (LaTeX-style), in the preamble:
+
+  ```latex
+  \usepackage{colors}
+  \usepackage{fonts, shapes}   %% comma-separate to import several
+  \textcolor{#2563eb}{Now available}
+  ```
+
+  `\use{...}` is an alias for `\usepackage{...}`.
+
+- **From code**, on the engine:
+
+  ```ts
+  import { ReTeXEngine, colorsLibrary } from "@regmisatyam/retex";
+  const engine = new ReTeXEngine().use(colorsLibrary);
+  ```
+
+If you use a gated command without importing its library, ReTeX emits a
+diagnostic telling you which `\usepackage{...}` to add (code `RTX4005`). An
+unknown library name is flagged too (`RTX4004`).
+
+### Built-in libraries
+
+| Library    | Activate with            | Provides                                                                  |
+| ---------- | ------------------------ | ------------------------------------------------------------------------- |
+| `fonts`    | `\usepackage{fonts}`     | `\fontfamily`, `\fontsize`, `\small`…`\Huge`, `\normalsize`, `\ttfamily`   |
+| `shapes`   | `\usepackage{shapes}`    | `\hrule`, `\divider`, `\dashrule`, `\dotrule`, `\thickrule`, `\doublerule`, `\vspace`, `\hspace` |
+| `colors`   | `\usepackage{colors}`    | `\textcolor`, `\themecolor`                                               |
+| `modern`   | `\usepackage{modern}`    | A styled look (violet accent, underlined headings) **+ all of the above** |
+| `classic`  | `\usepackage{classic}`   | A serif look with ruled headings **+ all of the above**                   |
+| `compact`  | `\usepackage{compact}`   | A dense, single-accent look **+ all of the above**                        |
+
+`color`, `font`, and `shape` are accepted as singular aliases for the first
+three. The theme packs (`modern`/`classic`/`compact`) bundle the full styling
+toolkit, so importing one is the quickest way to get a complete, polished
+document.
+
+---
+
 ## Typography
+
+Basic emphasis is core. Color and explicit font control are gated behind
+libraries (noted per command).
 
 ### `\textbf{content}`
 
@@ -167,6 +223,8 @@ Struck-through text.
 
 ### `\textcolor{color}{content}`
 
+> 🔌 _Library:_ `colors` — `\usepackage{colors}`
+
 Color text with a hex or named color. The color is validated (`#rgb`,
 `#rrggbb`, `#rrggbbaa`, `rgb()/rgba()/hsl()/hsla()`, or a known CSS name);
 invalid colors are ignored and produce a warning.
@@ -176,6 +234,8 @@ invalid colors are ignored and produce a warning.
 ```
 
 ### `\fontsize{size}{content}`
+
+> 🔌 _Library:_ `fonts` — `\usepackage{fonts}`
 
 Set an explicit font size for the wrapped content. The size must be a valid CSS
 dimension (e.g. `14pt`, `1.2em`, `18px`); invalid sizes fall back to `1em` with a
@@ -187,13 +247,19 @@ warning.
 
 ### `\fontfamily{family}{content}`
 
-Set the font family for the wrapped content.
+> 🔌 _Library:_ `fonts` — `\usepackage{fonts}`
+
+Set the font family for the wrapped content. The `fonts` library also exports a
+`fontStacks` catalog (Inter, Georgia, JetBrains Mono, …) and a `fontTheme(...)`
+helper for building a `fonts` theme patch from named stacks.
 
 ```latex
 \fontfamily{Georgia}{Serif text}
 ```
 
 ### `\themecolor{token}{content}`
+
+> 🔌 _Library:_ `colors` — `\usepackage{colors}`
 
 Color text using a token from the active theme. See
 [Theme color](#theme-color).
@@ -204,21 +270,23 @@ Color text using a token from the active theme. See
 
 ### Scoped switches
 
-These apply to the **rest of their enclosing group** (see
-[Scoped font switches](#scoped-font-switches)).
+`\bfseries` and `\itshape` are **core**; the size switches and `\ttfamily`
+require the **`fonts`** library. All apply to the **rest of their enclosing
+group** (see [Scoped font switches](#scoped-font-switches)).
 
-| Command        | Effect                                              | Example                |
-| -------------- | --------------------------------------------------- | ---------------------- |
-| `\small`       | Smaller font size                                   | `{\small fine print}`  |
-| `\large`       | Larger font size                                    | `{\large heading}`     |
-| `\Large`       | Even larger font size                               | `{\Large title}`       |
-| `\Huge`        | Largest font size                                   | `{\Huge name}`         |
-| `\normalsize`  | Reset to the document base size                     | `{\normalsize body}`   |
-| `\bfseries`    | Switch to bold                                      | `{\bfseries bold run}` |
-| `\itshape`     | Switch to italic                                    | `{\itshape italic run}`|
-| `\ttfamily`    | Switch to a monospace font                          | `{\ttfamily code}`     |
+| Command        | Effect                                              | Library | Example                |
+| -------------- | --------------------------------------------------- | ------- | ---------------------- |
+| `\bfseries`    | Switch to bold                                      | core    | `{\bfseries bold run}` |
+| `\itshape`     | Switch to italic                                    | core    | `{\itshape italic run}`|
+| `\small`       | Smaller font size                                   | `fonts` | `{\small fine print}`  |
+| `\large`       | Larger font size                                    | `fonts` | `{\large heading}`     |
+| `\Large`       | Even larger font size                               | `fonts` | `{\Large title}`       |
+| `\Huge`        | Largest font size                                   | `fonts` | `{\Huge name}`         |
+| `\normalsize`  | Reset to the document base size                     | `fonts` | `{\normalsize body}`   |
+| `\ttfamily`    | Switch to a monospace font                          | `fonts` | `{\ttfamily code}`     |
 
 ```latex
+\usepackage{fonts}
 {\Large \bfseries Section Heading}
 ```
 
@@ -457,37 +525,50 @@ API (`registerIcon`) or a plugin.
 
 ---
 
-## Primitives
+## Primitives & shapes
+
+`\\` / `\newline` / `\linebreak` are **core**. Rules, dividers, and explicit
+spacing are **shapes** — `\usepackage{shapes}`.
 
 ### `\\` — line break
 
-An explicit line break. `\newline` and `\linebreak` are equivalent.
+An explicit line break. `\newline` and `\linebreak` are equivalent. **Core.**
 
 ```latex
 123 Main St \\ Springfield, USA
 ```
 
-### `\hrule` / `\divider` — horizontal rule
+### Horizontal rules / dividers
 
-A horizontal rule / divider. The two commands are synonyms.
+> 🔌 _Library:_ `shapes` — `\usepackage{shapes}`
+
+A family of horizontal rules. `\hrule` and `\divider` are synonyms for a thin
+solid line; the others vary the line style.
+
+| Command        | Style          |
+| -------------- | -------------- |
+| `\hrule`       | thin solid     |
+| `\divider`     | thin solid     |
+| `\dashrule`    | dashed         |
+| `\dotrule`     | dotted         |
+| `\thickrule`   | thick solid    |
+| `\doublerule`  | double         |
 
 ```latex
+\usepackage{shapes}
 \hrule
+\dashrule
 ```
 
-### `\vspace{size}` — vertical space
+### `\vspace{size}` / `\hspace{size}` — spacing
 
-Vertical space. The size must be a valid CSS dimension (defaults to `1em`).
+> 🔌 _Library:_ `shapes` — `\usepackage{shapes}`
+
+Vertical / horizontal space. The size must be a valid CSS dimension (defaults to
+`1em`).
 
 ```latex
 \vspace{1em}
-```
-
-### `\hspace{size}` — horizontal space
-
-Horizontal space.
-
-```latex
 Left \hspace{2em} Right
 ```
 
@@ -496,6 +577,8 @@ Left \hspace{2em} Right
 ## Theme color
 
 ### `\themecolor{token}{content}`
+
+> 🔌 _Library:_ `colors` — `\usepackage{colors}`
 
 Colors text using a named token from the active [theme](API.md#theming). Every
 theme color is exposed as the CSS variable `--retex-color-<token>`, so this works
