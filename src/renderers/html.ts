@@ -2,9 +2,8 @@ import {
   type Node,
   type DocumentNode,
   type SectionNode,
-  type ContactNode,
   type Theme,
-  type FieldMap,
+  type SourceRange,
 } from "../types/index.js";
 import { resolveTheme } from "../theme/themes.js";
 import {
@@ -28,6 +27,14 @@ export interface HtmlRenderOptions {
   overrides?: Map<string, HtmlRenderFn>;
   /** Group leading contact commands into a `<header>`. Default `true`. */
   header?: boolean;
+  /**
+   * Emit source-position attributes (`data-rtx-pos="start:end"` and
+   * `data-rtx-type`) on rendered elements so a live editor can map preview
+   * clicks back to the source and vice-versa (Overleaf-style two-way sync).
+   * Offsets are zero-based UTF-16 code-unit offsets into the original source.
+   * Default `false` — final/exported HTML stays clean and unannotated.
+   */
+  sourceMap?: boolean;
 }
 
 const tokenSafe = (s: string): string => s.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -42,6 +49,7 @@ export class HtmlRenderer {
   private readonly prefix: string;
   private readonly overrides: Map<string, HtmlRenderFn>;
   private readonly useHeader: boolean;
+  private readonly sourceMap: boolean;
   private readonly ctx: HtmlRenderContext;
 
   constructor(options: HtmlRenderOptions = {}) {
@@ -49,6 +57,7 @@ export class HtmlRenderer {
     this.prefix = options.classPrefix ?? "retex";
     this.overrides = options.overrides ?? new Map();
     this.useHeader = options.header ?? true;
+    this.sourceMap = options.sourceMap ?? false;
     this.ctx = {
       theme: this.theme,
       classPrefix: this.prefix,
@@ -102,8 +111,8 @@ export class HtmlRenderer {
   private renderSection(section: SectionNode, body: Node[]): string {
     const styleMod = ` ${this.cls("section")}--${this.theme.sectionStyle}`;
     return (
-      `<section class="${this.cls("section")}${styleMod}">` +
-      `<h2 class="${this.cls("section-title")}">${escapeHtml(section.title)}</h2>` +
+      `<section class="${this.cls("section")}${styleMod}"${this.src(section)}>` +
+      `<h2 class="${this.cls("section-title")}"${this.src(section, "section-title")}>${escapeHtml(section.title)}</h2>` +
       `<div class="${this.cls("section-body")}">${this.renderFlow(body)}</div>` +
       `</section>`
     );
@@ -117,8 +126,10 @@ export class HtmlRenderer {
     let html = "";
     if (hasHeader) {
       html += `<header class="${this.cls("header")}">`;
-      if (name) html += `<h1 class="${this.cls("name")}">${escapeHtml(name.value)}</h1>`;
-      if (title) html += `<p class="${this.cls("title")}">${escapeHtml(title.value)}</p>`;
+      if (name)
+        html += `<h1 class="${this.cls("name")}"${this.src(name)}>${escapeHtml(name.value)}</h1>`;
+      if (title)
+        html += `<p class="${this.cls("title")}"${this.src(title)}>${escapeHtml(title.value)}</p>`;
       if (contacts.length > 0) {
         html += `<div class="${this.cls("contact")}">${contacts
           .map((c) => this.renderContactItem(c))
@@ -132,37 +143,45 @@ export class HtmlRenderer {
 
   private renderContactItem(node: Node): string {
     const item = this.cls("contact-item");
+    const src = this.src(node);
     if (node.type === "contact") {
       switch (node.field) {
         case "email":
-          return this.contactLink(`mailto:${node.value}`, "email", node.value, item);
+          return this.contactLink(`mailto:${node.value}`, "email", node.value, item, src);
         case "phone":
           return this.contactLink(
             `tel:${node.value.replace(/[^\d+]/g, "")}`,
             "phone",
             node.value,
             item,
+            src,
           );
         case "website":
-          return this.contactLink(node.value, "website", node.value, item);
+          return this.contactLink(node.value, "website", node.value, item, src);
         case "location":
-          return `<span class="${item}">${this.icon("location")}${escapeHtml(node.value)}</span>`;
+          return `<span class="${item}"${src}>${this.icon("location")}${escapeHtml(node.value)}</span>`;
         default:
-          return `<span class="${item}">${escapeHtml(node.value)}</span>`;
+          return `<span class="${item}"${src}>${escapeHtml(node.value)}</span>`;
       }
     }
     if (node.type === "icon")
-      return `<span class="${item}">${this.renderNode(node)}</span>`;
+      return `<span class="${item}"${src}>${this.renderNode(node)}</span>`;
     if (node.type === "link" || node.type === "url") {
-      return `<span class="${item}">${this.renderNode(node)}</span>`;
+      return `<span class="${item}"${src}>${this.renderNode(node)}</span>`;
     }
     return this.renderNode(node);
   }
 
-  private contactLink(url: string, icon: string, label: string, cls: string): string {
+  private contactLink(
+    url: string,
+    icon: string,
+    label: string,
+    cls: string,
+    src = "",
+  ): string {
     const { safe } = sanitizeUrl(url);
     return (
-      `<a class="${cls}" href="${escapeAttribute(safe)}">` +
+      `<a class="${cls}"${src} href="${escapeAttribute(safe)}">` +
       `${this.icon(icon)}${escapeHtml(label)}</a>`
     );
   }
@@ -175,7 +194,10 @@ export class HtmlRenderer {
     let inline: Node[] = [];
     const flush = (): void => {
       const html = this.renderInline(inline).trim();
-      if (html) out.push(`<p class="${this.cls("para")}">${html}</p>`);
+      if (html)
+        out.push(
+          `<p class="${this.cls("para")}"${this.srcSpan(inline, "para")}>${html}</p>`,
+        );
       inline = [];
     };
     for (const node of nodes) {
@@ -212,35 +234,35 @@ export class HtmlRenderer {
       case "linebreak":
         return "<br>";
       case "rule":
-        return `<hr class="${this.cls("rule")}">`;
+        return `<hr class="${this.cls("rule")}"${this.src(node)}>`;
       case "space":
         return node.axis === "vertical"
-          ? `<div style="height:${this.dim(node.size)}"></div>`
-          : `<span style="display:inline-block;width:${this.dim(node.size)}"></span>`;
+          ? `<div style="height:${this.dim(node.size)}"${this.src(node)}></div>`
+          : `<span style="display:inline-block;width:${this.dim(node.size)}"${this.src(node)}></span>`;
       case "group":
         return this.renderInline(node.children);
       case "bold":
-        return `<strong>${this.renderInline(node.children)}</strong>`;
+        return `<strong${this.src(node)}>${this.renderInline(node.children)}</strong>`;
       case "italic":
-        return `<em>${this.renderInline(node.children)}</em>`;
+        return `<em${this.src(node)}>${this.renderInline(node.children)}</em>`;
       case "underline":
-        return `<u>${this.renderInline(node.children)}</u>`;
+        return `<u${this.src(node)}>${this.renderInline(node.children)}</u>`;
       case "strike":
-        return `<s>${this.renderInline(node.children)}</s>`;
+        return `<s${this.src(node)}>${this.renderInline(node.children)}</s>`;
       case "color": {
         const inner = this.renderInline(node.children);
         if (!node.color || !isSafeColor(node.color)) return inner;
-        return `<span style="color:${node.color}">${inner}</span>`;
+        return `<span style="color:${node.color}"${this.src(node)}>${inner}</span>`;
       }
       case "themecolor": {
         const inner = this.renderInline(node.children);
         const tok = tokenSafe(node.token);
-        return `<span style="color:var(--${this.prefix}-color-${tok}, currentColor)">${inner}</span>`;
+        return `<span style="color:var(--${this.prefix}-color-${tok}, currentColor)"${this.src(node)}>${inner}</span>`;
       }
       case "fontsize": {
         const inner = this.renderInline(node.children);
         if (!isSafeDimension(node.size)) return inner;
-        return `<span style="font-size:${node.size}">${inner}</span>`;
+        return `<span style="font-size:${node.size}"${this.src(node)}>${inner}</span>`;
       }
       case "fontfamily": {
         const inner = this.renderInline(node.children);
@@ -249,34 +271,38 @@ export class HtmlRenderer {
             ? `var(--${this.prefix}-font-mono)`
             : sanitizeStyleValue(node.family);
         if (!family) return inner;
-        return `<span style="font-family:${family}">${inner}</span>`;
+        return `<span style="font-family:${family}"${this.src(node)}>${inner}</span>`;
       }
       case "fontscale": {
         const inner = this.renderInline(node.children);
-        if (node.scale === "normal") return `<span>${inner}</span>`;
-        return `<span class="${this.cls(`scale-${node.scale}`)}">${inner}</span>`;
+        if (node.scale === "normal") return `<span${this.src(node)}>${inner}</span>`;
+        return `<span class="${this.cls(`scale-${node.scale}`)}"${this.src(node)}>${inner}</span>`;
       }
       case "link":
-        return this.renderLink(node.href, this.renderInline(node.children));
+        return this.renderLink(
+          node.href,
+          this.renderInline(node.children),
+          this.src(node),
+        );
       case "url":
-        return this.renderLink(node.href, escapeHtml(node.rawHref));
+        return this.renderLink(node.href, escapeHtml(node.rawHref), this.src(node));
       case "icon":
         return this.icon(node.name);
       case "section":
         // A section nested in flow (e.g. subsection) renders as a heading.
-        return `<h${node.level + 1} class="${this.cls("subsection-title")}">${escapeHtml(node.title)}</h${node.level + 1}>`;
+        return `<h${node.level + 1} class="${this.cls("subsection-title")}"${this.src(node)}>${escapeHtml(node.title)}</h${node.level + 1}>`;
       case "list":
         return this.renderList(node);
       case "columns":
         return this.renderColumns(node);
       case "skills":
-        return this.renderSkills(node.items);
+        return this.renderSkills(node);
       case "job":
-        return this.renderEntry(node.fields, node.children, "job");
+        return this.renderEntry(node, "job");
       case "education":
-        return this.renderEntry(node.fields, node.children, "education");
+        return this.renderEntry(node, "education");
       case "project":
-        return this.renderEntry(node.fields, node.children, "project");
+        return this.renderEntry(node, "project");
       case "contact":
         return this.renderContactItem(node);
       case "command":
@@ -288,19 +314,21 @@ export class HtmlRenderer {
     }
   }
 
-  private renderLink(href: string, label: string): string {
+  private renderLink(href: string, label: string, src = ""): string {
     const { safe } = sanitizeUrl(href);
     const external = /^https?:/i.test(safe);
     const rel = external ? ' target="_blank" rel="noopener noreferrer"' : "";
-    return `<a class="${this.cls("link")}" href="${escapeAttribute(safe)}"${rel}>${label}</a>`;
+    return `<a class="${this.cls("link")}"${src} href="${escapeAttribute(safe)}"${rel}>${label}</a>`;
   }
 
   private renderList(node: Extract<Node, { type: "list" }>): string {
     const tag = node.kind === "enumerate" ? "ol" : "ul";
     const items = node.items
-      .map((item) => `<li>${this.renderInline(item.children).trim()}</li>`)
+      .map(
+        (item) => `<li${this.src(item)}>${this.renderInline(item.children).trim()}</li>`,
+      )
       .join("");
-    return `<${tag} class="${this.cls("list")}">${items}</${tag}>`;
+    return `<${tag} class="${this.cls("list")}"${this.src(node)}>${items}</${tag}>`;
   }
 
   private renderColumns(node: Extract<Node, { type: "columns" }>): string {
@@ -308,27 +336,31 @@ export class HtmlRenderer {
       .map((col) => {
         const basis = isSafeDimension(col.width) ? col.width : "auto";
         const flex = basis === "auto" ? "flex:1 1 0" : `flex:0 0 ${basis}`;
-        return `<div class="${this.cls("column")}" style="${flex}">${this.renderFlow(col.children)}</div>`;
+        return `<div class="${this.cls("column")}" style="${flex}"${this.src(col)}>${this.renderFlow(col.children)}</div>`;
       })
       .join("");
-    return `<div class="${this.cls("columns")}">${cols}</div>`;
+    return `<div class="${this.cls("columns")}"${this.src(node)}>${cols}</div>`;
   }
 
-  private renderSkills(items: string[]): string {
-    const lis = items
+  private renderSkills(node: Extract<Node, { type: "skills" }>): string {
+    const lis = node.items
       .map((s) => `<li class="${this.cls("skill")}">${escapeHtml(s)}</li>`)
       .join("");
-    return `<ul class="${this.cls("skills")}">${lis}</ul>`;
+    return `<ul class="${this.cls("skills")}"${this.src(node)}>${lis}</ul>`;
   }
 
-  private renderEntry(fields: FieldMap, body: Node[], kind: string): string {
+  private renderEntry(
+    node: Extract<Node, { type: "job" | "education" | "project" }>,
+    kind: string,
+  ): string {
+    const { fields, children: body } = node;
     const { title, subtitle, dates, location, url } = entryParts(fields, kind);
 
     const titleHtml = url
       ? this.renderLink(sanitizeUrl(url).safe, escapeHtml(title))
       : escapeHtml(title);
 
-    let html = `<div class="${this.cls("entry")} ${this.cls(kind)}">`;
+    let html = `<div class="${this.cls("entry")} ${this.cls(kind)}"${this.src(node)}>`;
     html += `<div class="${this.cls("entry-row")}">`;
     html += `<span class="${this.cls("entry-title")}">${titleHtml}</span>`;
     if (dates)
@@ -351,7 +383,7 @@ export class HtmlRenderer {
   private renderCommand(node: Extract<Node, { type: "command" }>): string {
     if (node.name === "center") {
       const inner = node.args.flatMap((a) => a.children);
-      return `<div class="${this.cls("center")}">${this.renderFlow(inner)}</div>`;
+      return `<div class="${this.cls("center")}"${this.src(node)}>${this.renderFlow(inner)}</div>`;
     }
     // Unknown / unhandled command: render its argument content so nothing is lost.
     const inner = node.args.flatMap((a) => a.children);
@@ -359,6 +391,37 @@ export class HtmlRenderer {
   }
 
   /* ------------------------------ helpers ----------------------------- */
+
+  /**
+   * Source-position attributes for a node — `data-rtx-pos="start:end"` plus a
+   * `data-rtx-type`. Returns an empty string unless `sourceMap` is enabled and
+   * the node carries a range. Powers the live-preview two-way sync: a client
+   * reads these to map a clicked element back to the exact source offsets (and,
+   * in reverse, to find the element for a caret offset).
+   */
+  private src(
+    node: { range?: SourceRange; type?: string } | undefined,
+    type?: string,
+  ): string {
+    if (!this.sourceMap || !node?.range) return "";
+    const kind = type ?? node.type;
+    const kindAttr = kind ? ` data-rtx-type="${kind}"` : "";
+    return ` data-rtx-pos="${node.range.start.offset}:${node.range.end.offset}"${kindAttr}`;
+  }
+
+  /** Like {@link src}, but spans a run of inline nodes (merges their ranges). */
+  private srcSpan(nodes: Node[], type: string): string {
+    if (!this.sourceMap) return "";
+    let start = Infinity;
+    let end = -Infinity;
+    for (const n of nodes) {
+      if (!n.range) continue;
+      if (n.range.start.offset < start) start = n.range.start.offset;
+      if (n.range.end.offset > end) end = n.range.end.offset;
+    }
+    if (end < 0) return "";
+    return ` data-rtx-pos="${start}:${end}" data-rtx-type="${type}"`;
+  }
 
   private icon(name: string): string {
     const svg = iconToSvg(name, { className: this.cls("icon") });

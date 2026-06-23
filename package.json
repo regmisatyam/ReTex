@@ -54,6 +54,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
+    "playground": "npm run build && node examples/serve.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

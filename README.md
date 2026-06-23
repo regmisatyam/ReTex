@@ -73,6 +73,9 @@ see [Syntax](docs/SYNTAX.md).)
   React element tree, a structured JSON AST, and print-ready HTML/PDF.
 - **Editor tooling** — completion, hover docs, semantic tokens, diagnostics,
   formatting, and AST inspection via `EditorService`.
+- **Two-way preview** — opt-in `sourceMap` HTML stamps elements with source
+  offsets so a live editor can sync both ways (click preview ↔ highlight code),
+  Overleaf-style. See [`examples/playground.html`](examples/playground.html).
 - **Incremental parsing** — block-level caching for fast live preview.
 - **Security** — every text node and attribute is escaped; every URL is vetted.
   No `eval`, no `Function`, no code execution of source.
@@ -419,6 +422,70 @@ optional quick-fixes, so editors can wire up code actions and doc links.
 
 ---
 
+## Two-way preview (source mapping)
+
+Like Overleaf's SyncTeX, ReTeX can keep an editor and its live preview in sync
+in **both directions** — click an element in the preview to jump to the source
+that produced it, and move the caret in the source to highlight the matching
+element in the preview.
+
+Turn it on with the `sourceMap` render option. The HTML renderer then stamps
+every meaningful element with `data-rtx-pos="start:end"` (zero-based UTF-16
+offsets into the source) and a `data-rtx-type` (the originating node):
+
+```ts
+const engine = new ReTeXEngine();
+engine.toHtml(source, { sourceMap: true });
+// …<section data-rtx-pos="20:40" data-rtx-type="section">…
+//   <p class="retex-para" data-rtx-pos="101:130" data-rtx-type="para">
+//     Built <strong data-rtx-pos="110:128" data-rtx-type="bold">compilers</strong>.
+//   </p>…
+```
+
+`sourceMap` defaults to **off**, so exported/production HTML stays clean and
+unannotated — you only pay for the attributes when driving a live editor.
+
+A few tiny, **editor-agnostic** helpers turn those attributes into sync (they
+work with the real DOM or any object exposing `getAttribute`, so the core never
+touches `document`):
+
+```ts
+import {
+  closestSourcePos,     // preview → code: nearest annotated ancestor's span
+  pickElementForOffset, // code → preview: tightest element under the caret
+  SOURCE_POS_ATTR,
+} from "@regmisatyam/retex";
+
+// Reverse sync — click the preview, select the source it came from:
+preview.addEventListener("click", (e) => {
+  const span = closestSourcePos(e.target);
+  if (span) {
+    textarea.focus();
+    textarea.setSelectionRange(span.start, span.end);
+  }
+});
+
+// Forward sync — caret moves, highlight the matching preview element:
+function onCaretMove() {
+  const el = pickElementForOffset(
+    preview.querySelectorAll(`[${SOURCE_POS_ATTR}]`),
+    textarea.selectionStart,
+  );
+  el?.classList.add("active");
+}
+```
+
+### Try it
+
+A complete, dependency-free playground ships in [`examples/playground.html`](examples/playground.html)
+— a split editor/preview with both sync directions wired up:
+
+```bash
+npm run playground   # builds the library, serves it, and opens the demo
+```
+
+---
+
 ## Security
 
 ReTeX renders untrusted markup, so safety is built into every layer:
@@ -459,6 +526,7 @@ const { ast, diagnostics, stats } = inc.compile(source);
 
 ```bash
 npm run build       # bundle with tsup (ESM + CJS + d.ts)
+npm run playground  # build + serve the two-way preview demo
 npm run typecheck   # tsc --noEmit
 npm test            # run the test suite (vitest)
 npm run test:watch  # watch mode

@@ -315,6 +315,43 @@ All methods are pure and synchronous. Related types: `EditorServiceOptions`,
 
 ---
 
+## Two-way preview (source map)
+
+Render with `{ sourceMap: true }` (see [`HtmlRenderOptions`](#htmlrenderoptions))
+to stamp each element with `data-rtx-pos="start:end"` (zero-based UTF-16 source
+offsets) and `data-rtx-type` (the originating node type). These editor-agnostic
+helpers turn those attributes into Overleaf-style sync. They only require an
+object with `getAttribute`, so they run anywhere — no `document` dependency.
+
+```ts
+const SOURCE_POS_ATTR: "data-rtx-pos";
+const SOURCE_TYPE_ATTR: "data-rtx-type";
+
+interface SourceSpan { start: number; end: number; }
+
+function parseSourcePos(value: string | null | undefined): SourceSpan | null;
+function readSourcePos(el: AttrElement | null | undefined): SourceSpan | null;
+function readSourceType(el: AttrElement | null | undefined): string | null;
+function closestSourcePos(el: ClosestElement | null | undefined): SourceSpan | null;
+function pickElementForOffset<T extends AttrElement>(els: Iterable<T>, offset: number): T | null;
+function spanContains(span: SourceSpan, offset: number): boolean;
+function spanLength(span: SourceSpan): number;
+```
+
+| Function              | Direction        | Description                                                          |
+| --------------------- | ---------------- | ------------------------------------------------------------------- |
+| `closestSourcePos`    | preview → code   | Span of the nearest annotated ancestor of a clicked element.        |
+| `pickElementForOffset`| code → preview   | The tightest (most specific) element whose span contains an offset. |
+| `readSourcePos`       | —                | Parse one element's `data-rtx-pos` into a `SourceSpan`.             |
+| `readSourceType`      | —                | Read one element's `data-rtx-type`.                                 |
+| `parseSourcePos`      | —                | Parse a raw `"start:end"` string.                                   |
+| `spanContains` / `spanLength` | —        | Span predicates used by the pickers.                                |
+
+Related types: `SourceSpan`, `AttrElement`, `ClosestElement`. A runnable
+end-to-end demo lives in `examples/playground.html` (`npm run playground`).
+
+---
+
 ## Incremental
 
 ```ts
@@ -432,6 +469,12 @@ interface HtmlRenderOptions {
   overrides?: Map<string, HtmlRenderFn>;
   /** Group leading contact commands into a <header>. Default true. */
   header?: boolean;
+  /**
+   * Emit `data-rtx-pos="start:end"` / `data-rtx-type` source-position
+   * attributes for two-way live preview. Default false — exported HTML stays
+   * clean. See [Two-way preview](#two-way-preview-source-map).
+   */
+  sourceMap?: boolean;
 }
 ```
 

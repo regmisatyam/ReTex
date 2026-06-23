@@ -124,3 +124,68 @@ Built \\textbf{distributed systems}. Reduced latency by 40\\%.
     expect(html(src)).toMatchSnapshot();
   });
 });
+
+describe("html renderer — source map (two-way preview)", () => {
+  const SRC = `\\name{Ada Lovelace}
+\\section{Experience}
+\\job{title=Engineer, company=ACME, start=2021, end=Present}{
+Built \\textbf{compilers}.
+}`;
+
+  /** Pull the `data-rtx-pos` span for the element of a given `data-rtx-type`. */
+  const posOf = (out: string, type: string): [number, number] | null => {
+    const m = new RegExp(`data-rtx-pos="(\\d+):(\\d+)" data-rtx-type="${type}"`).exec(
+      out,
+    );
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  };
+
+  it("emits no source attributes by default", () => {
+    const out = engine.toHtml(SRC);
+    expect(out).not.toContain("data-rtx-pos");
+    expect(out).not.toContain("data-rtx-type");
+  });
+
+  it("annotates structural elements when sourceMap is enabled", () => {
+    const out = engine.toHtml(SRC, { sourceMap: true });
+    expect(out).toContain('data-rtx-type="section"');
+    expect(out).toContain('data-rtx-type="job"');
+    expect(out).toContain('data-rtx-type="para"');
+    expect(out).toContain('data-rtx-type="bold"');
+  });
+
+  it("maps offsets back to the exact source bytes", () => {
+    const out = engine.toHtml(SRC, { sourceMap: true });
+
+    const section = posOf(out, "section");
+    expect(section).not.toBeNull();
+    expect(SRC.slice(section![0], section![1])).toBe("\\section{Experience}");
+
+    const bold = posOf(out, "bold");
+    expect(bold).not.toBeNull();
+    expect(SRC.slice(bold![0], bold![1])).toBe("\\textbf{compilers}");
+  });
+
+  it("nests inline spans inside their paragraph span", () => {
+    const out = engine.toHtml(SRC, { sourceMap: true });
+    const para = posOf(out, "para")!;
+    const bold = posOf(out, "bold")!;
+    // The bold run is contained within the paragraph's merged span.
+    expect(bold[0]).toBeGreaterThanOrEqual(para[0]);
+    expect(bold[1]).toBeLessThanOrEqual(para[1]);
+  });
+
+  it("annotates list items and skills", () => {
+    const out = engine.toHtml(
+      "\\section{S}\n\\begin{itemize}\\item one\\item two\\end{itemize}\n\\skills{A, B}",
+      { sourceMap: true },
+    );
+    expect(out).toContain('data-rtx-type="list"');
+    expect(out).toContain('data-rtx-type="item"');
+    expect(out).toContain('data-rtx-type="skills"');
+  });
+
+  it("keeps the default render byte-for-byte identical to sourceMap:false", () => {
+    expect(engine.toHtml(SRC)).toBe(engine.toHtml(SRC, { sourceMap: false }));
+  });
+});

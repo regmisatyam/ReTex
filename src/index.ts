@@ -135,6 +135,20 @@ export type {
   SemanticTokenType,
 } from "./editor/index.js";
 
+/* --------------------- two-way preview / source map ------------------ */
+export {
+  SOURCE_POS_ATTR,
+  SOURCE_TYPE_ATTR,
+  parseSourcePos,
+  readSourcePos,
+  readSourceType,
+  closestSourcePos,
+  spanLength,
+  spanContains,
+  pickElementForOffset,
+} from "./editor/index.js";
+export type { SourceSpan, AttrElement, ClosestElement } from "./editor/index.js";
+
 /* ---------------------------- incremental ---------------------------- */
 export {
   IncrementalCompiler,

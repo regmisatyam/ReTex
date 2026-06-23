@@ -187,6 +187,20 @@ Produces clean, semantic, fully-escaped HTML. Class names are prefixed
 inline `<style>`. Every text node and attribute is escaped, and every URL is
 re-sanitized at render time as defense in depth.
 
+#### Source mapping for two-way preview
+
+The `SourceRange` provenance threaded from the tokenizer all the way to the AST
+pays off here: with `{ sourceMap: true }`, the HTML renderer stamps each
+structural and inline element with `data-rtx-pos="start:end"` (the node's
+zero-based UTF-16 source offsets) and `data-rtx-type`. A live editor reads those
+to map a preview click back to the source (`closestSourcePos`) and a caret
+offset forward to the tightest matching element (`pickElementForOffset`) — the
+helpers live in `src/editor/sync.ts` and are pure/DOM-free. The flag defaults to
+off so exported HTML is unannotated; the only renderer changes are appended
+attributes, never restructured markup. (List items and columns gain their own
+ranges in `builtins.ts` so individual entries are addressable, not just the
+enclosing environment.)
+
 ### React renderer
 
 Mirrors the HTML renderer's structure and class names — so the same theme
@@ -387,6 +401,7 @@ src/
 ├── editor/
 │   ├── editor.ts         # EditorService (completion/hover/tokens/diagnostics/…)
 │   ├── printer.ts        # printDocument (the formatter)
+│   ├── sync.ts           # two-way preview source-map helpers (DOM-free)
 │   └── index.ts
 ├── incremental/
 │   ├── incremental.ts    # IncrementalCompiler, splitBalancedSegments, isBalanced

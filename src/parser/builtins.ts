@@ -436,6 +436,23 @@ const PRIMITIVES: CommandDefinition[] = [
 
 /* ----------------------------- environments --------------------------- */
 
+/**
+ * Full source span of an `itemCommand` entry: from the marker (`\item` /
+ * `\column`) to the end of its content. Gives list items and columns a precise
+ * range so source-mapped HTML (two-way preview) and `nodePathAt` can target an
+ * individual entry, not just the enclosing environment.
+ */
+function entryRange(e: {
+  marker: { range?: SourceRange };
+  content: Node[];
+}): SourceRange | undefined {
+  const start = e.marker.range?.start;
+  if (!start) return undefined;
+  let end: Position | undefined = e.marker.range?.end;
+  for (const n of e.content) if (n.range) end = n.range.end;
+  return end ? { start, end } : undefined;
+}
+
 const ENVIRONMENTS: EnvironmentDefinition[] = [
   {
     name: "itemize",
@@ -447,7 +464,11 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
       type: "list",
       kind: "itemize",
       items: (entries ?? []).map(
-        (e): ListItemNode => ({ type: "item", children: e.content }),
+        (e): ListItemNode => ({
+          type: "item",
+          children: e.content,
+          range: entryRange(e),
+        }),
       ),
     }),
   },
@@ -461,7 +482,11 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
       type: "list",
       kind: "enumerate",
       items: (entries ?? []).map(
-        (e): ListItemNode => ({ type: "item", children: e.content }),
+        (e): ListItemNode => ({
+          type: "item",
+          children: e.content,
+          range: entryRange(e),
+        }),
       ),
     }),
   },
@@ -476,7 +501,7 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
       type: "columns",
       columns: (entries ?? []).map((e): ColumnNode => {
         const width = utils.textOf(e.marker.args[0]).trim() || "auto";
-        return { type: "column", width, children: e.content };
+        return { type: "column", width, children: e.content, range: entryRange(e) };
       }),
     }),
   },
