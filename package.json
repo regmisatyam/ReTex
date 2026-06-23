@@ -1,5 +1,5 @@
 {
-  "name": "retex",
+  "name": "@regmisatyam/retex",
   "version": "0.1.0",
   "description": "ReTeX — a modern, high-performance LaTeX-inspired markup language and compiler for resumes, research papers, and developer portfolios.",
   "keywords": [
@@ -19,6 +19,17 @@
   ],
   "license": "MIT",
   "author": "ReTeX contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/regmisatyam/ReTex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/regmisatyam/ReTex/issues"
+  },
+  "homepage": "https://github.com/regmisatyam/ReTex#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

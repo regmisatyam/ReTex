@@ -84,7 +84,7 @@ see [Syntax](docs/SYNTAX.md).)
 ## Install
 
 ```bash
-npm install retex
+npm i @regmisatyam/retex
 ```
 
 React is an **optional peer dependency** — install it only if you use the React
@@ -100,20 +100,20 @@ generated HTML to PDF in the browser.
 
 The package exposes two entry points:
 
-| Import path     | Contents                                              |
-| --------------- | ----------------------------------------------------- |
-| `retex`         | The engine, pipeline, AST utilities, all renderers\*, theming, plugins, security, icons, editor, incremental compiler. |
-| `retex/react`   | The React renderer (`ReactRenderer`, `renderReact`).  |
+| Import path                | Contents                                              |
+| -------------------------- | ----------------------------------------------------- |
+| `@regmisatyam/retex`       | The engine, pipeline, AST utilities, all renderers\*, theming, plugins, security, icons, editor, incremental compiler. |
+| `@regmisatyam/retex/react` | The React renderer (`ReactRenderer`, `renderReact`).  |
 
-\* The React renderer is also re-exported from `retex`, but lives behind
-`retex/react` so the core bundle never imports React.
+\* The React renderer is also re-exported from `@regmisatyam/retex`, but lives behind
+`@regmisatyam/retex/react` so the core bundle never imports React.
 
 ---
 
 ## Quick start
 
 ```ts
-import { ReTeXEngine } from "retex";
+import { ReTeXEngine } from "@regmisatyam/retex";
 
 const engine = new ReTeXEngine();
 
@@ -252,7 +252,7 @@ engine.styles();                             // the theme's CSS (for the fragmen
 Or use the stage functions directly:
 
 ```ts
-import { tokenize, parse, validate, renderHtml } from "retex";
+import { tokenize, parse, validate, renderHtml } from "@regmisatyam/retex";
 
 const { ast } = parse(tokenize(source).tokens);
 const diagnostics = validate(ast);
@@ -266,7 +266,7 @@ factory yourself, so it works with React, Preact, or any compatible runtime.
 
 ```tsx
 import React from "react";
-import { ReTeXEngine } from "retex";
+import { ReTeXEngine } from "@regmisatyam/retex";
 
 function Resume({ source }: { source: string }) {
   const engine = React.useMemo(() => new ReTeXEngine(), []);
@@ -287,8 +287,8 @@ Standalone, via the dedicated subpath:
 
 ```tsx
 import React from "react";
-import { renderReact } from "retex/react";
-import { parse, tokenize } from "retex";
+import { renderReact } from "@regmisatyam/retex/react";
+import { parse, tokenize } from "@regmisatyam/retex";
 
 const { ast } = parse(tokenize(source).tokens);
 const element = renderReact(ast, {
@@ -327,7 +327,7 @@ Themes are plain data, deep-merged over the default. Pass a full `Theme` or a
 partial patch.
 
 ```ts
-import { ReTeXEngine, modernTheme } from "retex";
+import { ReTeXEngine, modernTheme } from "@regmisatyam/retex";
 
 // Use a preset:
 const a = new ReTeXEngine({ theme: modernTheme });
@@ -360,7 +360,7 @@ theme patches. The simplest case — a custom inline command with a render
 function and no custom AST node:
 
 ```ts
-import { ReTeXEngine } from "retex";
+import { ReTeXEngine } from "@regmisatyam/retex";
 
 const engine = new ReTeXEngine();
 
@@ -384,7 +384,7 @@ engine.toHtml("\\badge{Open to work}");
 Or package it as a reusable plugin and install with `.use()`:
 
 ```ts
-import { ReTeXEngine, badgePlugin, ratingPlugin } from "retex";
+import { ReTeXEngine, badgePlugin, ratingPlugin } from "@regmisatyam/retex";
 
 const engine = new ReTeXEngine({ plugins: [badgePlugin, ratingPlugin] });
 engine.toHtml("\\badge{New} \\rating{4}");
@@ -402,7 +402,7 @@ override. See **[docs/API.md](docs/API.md)** for the full `ReTeXPlugin` contract
 All methods are pure and synchronous.
 
 ```ts
-import { EditorService } from "retex";
+import { EditorService } from "@regmisatyam/retex";
 
 const editor = new EditorService();
 
@@ -446,7 +446,7 @@ paragraph re-parses only that block while the rest are served from cache and
 cheaply re-positioned.
 
 ```ts
-import { IncrementalCompiler } from "retex";
+import { IncrementalCompiler } from "@regmisatyam/retex";
 
 const inc = new IncrementalCompiler();
 const { ast, diagnostics, stats } = inc.compile(source);
