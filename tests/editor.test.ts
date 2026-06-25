@@ -96,4 +96,9 @@ describe("editor — formatting", () => {
     expect(out).toContain("\\item a");
     expect(out).toContain("\\end{itemize}");
   });
+
+  it("preserves the contact -icon variant when formatting", () => {
+    expect(ed.format("\\email-icon{a@b.com}")).toContain("\\email-icon{a@b.com}");
+    expect(ed.format("\\email{a@b.com}")).toContain("\\email{a@b.com}");
+  });
 });

@@ -308,23 +308,26 @@ export class ReactRenderer {
 
   private renderContact(node: Extract<Node, { type: "contact" }>): unknown {
     const item = this.cls("contact-item");
+    // Icons are opt-in: only the `-icon` command variants set `node.icon`.
+    const icon = node.icon ? node.field : "";
     switch (node.field) {
       case "email":
-        return this.contactLink(`mailto:${node.value}`, "email", node.value, item);
+        return this.contactLink(`mailto:${node.value}`, icon, node.value, item);
       case "phone":
         return this.contactLink(
           `tel:${node.value.replace(/[^\d+]/g, "")}`,
-          "phone",
+          icon,
           node.value,
           item,
         );
       case "website":
-        return this.contactLink(node.value, "website", node.value, item);
+        return this.contactLink(node.value, icon, node.value, item);
       case "location":
-        return this.el("span", { className: item }, [
-          this.renderIcon("location"),
-          node.value,
-        ]);
+        return this.el(
+          "span",
+          { className: item },
+          icon ? [this.renderIcon("location"), node.value] : [node.value],
+        );
       default:
         return this.el("span", { className: item }, [node.value]);
     }
@@ -332,7 +335,8 @@ export class ReactRenderer {
 
   private contactLink(url: string, icon: string, label: string, cls: string): unknown {
     const { safe } = sanitizeUrl(url);
-    return this.el("a", { className: cls, href: safe }, [this.renderIcon(icon), label]);
+    const children = icon ? [this.renderIcon(icon), label] : [label];
+    return this.el("a", { className: cls, href: safe }, children);
   }
 
   private renderLink(href: string, label: unknown[]): unknown {

@@ -148,21 +148,23 @@ export class HtmlRenderer {
     const item = this.cls("contact-item");
     const src = this.src(node);
     if (node.type === "contact") {
+      // Icons are opt-in: only the `-icon` command variants set `node.icon`.
+      const ic = node.icon ? this.icon(node.field) : "";
       switch (node.field) {
         case "email":
-          return this.contactLink(`mailto:${node.value}`, "email", node.value, item, src);
+          return this.contactLink(`mailto:${node.value}`, ic, node.value, item, src);
         case "phone":
           return this.contactLink(
             `tel:${node.value.replace(/[^\d+]/g, "")}`,
-            "phone",
+            ic,
             node.value,
             item,
             src,
           );
         case "website":
-          return this.contactLink(node.value, "website", node.value, item, src);
+          return this.contactLink(node.value, ic, node.value, item, src);
         case "location":
-          return `<span class="${item}"${src}>${this.icon("location")}${escapeHtml(node.value)}</span>`;
+          return `<span class="${item}"${src}>${ic}${escapeHtml(node.value)}</span>`;
         default:
           return `<span class="${item}"${src}>${escapeHtml(node.value)}</span>`;
       }
@@ -177,7 +179,7 @@ export class HtmlRenderer {
 
   private contactLink(
     url: string,
-    icon: string,
+    iconHtml: string,
     label: string,
     cls: string,
     src = "",
@@ -185,7 +187,7 @@ export class HtmlRenderer {
     const { safe } = sanitizeUrl(url);
     return (
       `<a class="${cls}"${src} href="${escapeAttribute(safe)}">` +
-      `${this.icon(icon)}${escapeHtml(label)}</a>`
+      `${iconHtml}${escapeHtml(label)}</a>`
     );
   }
 

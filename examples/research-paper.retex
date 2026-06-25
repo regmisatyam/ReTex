@@ -6,10 +6,10 @@
 \name{Dr. Alan Researcher}
 \title{Assistant Professor of Computer Science}
 
-\icon{email} \email{alan@university.edu}
-\icon{scholar} \href{https://scholar.google.com/citations?user=abc}{Google Scholar}
-\icon{orcid} \href{https://orcid.org/0000-0000-0000-0000}{ORCID}
-\icon{website} \website{https://alanresearcher.dev}
+\email-icon{alan@university.edu}
+\scholar-icon{} \href{https://scholar.google.com/citations?user=abc}{Google Scholar}
+\orcid-icon{} \href{https://orcid.org/0000-0000-0000-0000}{ORCID}
+\website-icon{https://alanresearcher.dev}
 
 \section{Research Interests}
 

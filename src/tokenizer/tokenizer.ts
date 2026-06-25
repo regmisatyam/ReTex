@@ -99,10 +99,17 @@ export class Tokenizer {
       return;
     }
 
-    // Control word: `\` + letters (+ optional trailing `*`).
+    // Control word: `\` + letters (+ optional trailing `*`). Internal hyphens
+    // are allowed so compound names like `\email-icon` tokenize as a single
+    // command; a hyphen only joins the name when it sits between two letter
+    // runs, so a trailing `\foo-` keeps the `-` as literal text.
     if (isLetter(next)) {
       let name = "";
       while (isLetter(this.peek())) name += this.read();
+      while (this.peek() === "-" && isLetter(this.peek(1))) {
+        name += this.read(); // the '-'
+        while (isLetter(this.peek())) name += this.read();
+      }
       if (this.peek() === "*") name += this.read();
       this.push(TokenType.Command, name, start);
       return;

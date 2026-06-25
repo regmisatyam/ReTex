@@ -2,6 +2,7 @@ import type {
   CommandDefinition,
   EnvironmentDefinition,
   ContactField,
+  MarkType,
   Node,
   ColumnNode,
   ListItemNode,
@@ -13,7 +14,7 @@ import type {
 import { DiagnosticSeverity, DiagnosticCode } from "../types/diagnostics.js";
 import { CommandRegistry } from "./registry.js";
 import { parseKeyValArg, parseListArg } from "./args.js";
-import { hasIcon } from "../icons/icons.js";
+import { hasIcon, iconNames } from "../icons/icons.js";
 
 /* ----------------------------- typography ----------------------------- */
 /*
@@ -37,12 +38,84 @@ const mark = (
   build: ({ args }) => ({ type, children: args[0]?.children ?? [] }) as Node,
 });
 
+/**
+ * Style keywords accepted inside `\text[...]`, mapped to their emphasis mark.
+ * Common aliases are included so `\text[b, i]` works like `\text[bold, italic]`.
+ */
+const STYLE_MARKS: Record<string, MarkType> = {
+  bold: "bold",
+  b: "bold",
+  bf: "bold",
+  strong: "bold",
+  italic: "italic",
+  i: "italic",
+  it: "italic",
+  em: "italic",
+  emph: "italic",
+  underline: "underline",
+  u: "underline",
+  strike: "strike",
+  strikethrough: "strike",
+  s: "strike",
+  sout: "strike",
+  del: "strike",
+};
+
+const ZERO_POS: Position = { offset: 0, line: 1, column: 1 };
+const STYLE_ZERO_RANGE: SourceRange = { start: ZERO_POS, end: ZERO_POS };
+
+/**
+ * `\text[bold, italic]{...}` — apply several emphasis styles at once. The styles
+ * listed in `[...]` are nested in order (first = outermost) so they combine,
+ * e.g. bold *and* italic. With no `[...]` it is a plain pass-through group, so
+ * `\text{...}` is always safe. Unlike `\textbf`/`\textit`, this composes.
+ */
+const textStyled: CommandDefinition = {
+  name: "text",
+  category: "inline",
+  args: [
+    { kind: "list", name: "styles", optional: true, delimiter: "bracket" },
+    { kind: "content", name: "content" },
+  ],
+  summary: "Apply one or more text styles at once, e.g. \\text[bold, italic]{...}.",
+  documentation:
+    "Combines basic emphasis styles in a single command. List any of `bold`, " +
+    "`italic`, `underline`, `strike` (and aliases like `b`, `i`, `u`, `s`) " +
+    "inside `[...]`; they nest in order so `\\text[bold, italic]{Hi}` renders " +
+    "bold *and* italic. With no `[...]`, `\\text{...}` is a plain group.",
+  example: "\\text[bold, italic]{Hello}",
+  build: ({ args, report }) => {
+    const styleArg = args.find((a) => a.kind === "optional");
+    const contentArg = args.find((a) => a.kind === "required");
+    const styles = parseListArg(styleArg?.raw ?? "");
+    let nodes: Node[] = contentArg?.children ?? [];
+    let wrapped = false;
+    // Apply right-to-left so the first listed style ends up outermost.
+    for (let i = styles.length - 1; i >= 0; i--) {
+      const type = STYLE_MARKS[styles[i]!.toLowerCase()];
+      if (!type) {
+        report({
+          severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.UnknownCommand,
+          message: `Unknown text style "${styles[i]}". Use bold, italic, underline, or strike.`,
+          range: styleArg?.range ?? STYLE_ZERO_RANGE,
+        });
+        continue;
+      }
+      nodes = [{ type, children: nodes } as Node];
+      wrapped = true;
+    }
+    return wrapped ? nodes[0]! : ({ type: "group", children: nodes } as Node);
+  },
+};
+
 const TYPOGRAPHY: CommandDefinition[] = [
   mark("textbf", "bold", "Bold text."),
   mark("textit", "italic", "Italic text."),
   mark("emph", "italic", "Emphasized (italic) text."),
   mark("underline", "underline", "Underlined text."),
   mark("sout", "strike", "Struck-through text."),
+  textStyled,
 
   {
     name: "bfseries",
@@ -157,24 +230,62 @@ const SECTIONS: CommandDefinition[] = [
 
 /* --------------------------- contact / header ------------------------- */
 
-const CONTACT_FIELDS: Array<{ cmd: string; field: ContactField; summary: string }> = [
+const CONTACT_FIELDS: Array<{
+  cmd: string;
+  field: ContactField;
+  summary: string;
+  /** Whether the field has an associated glyph (and thus an `-icon` variant). */
+  hasIcon?: boolean;
+}> = [
   { cmd: "name", field: "name", summary: "Your full name (document header)." },
   { cmd: "title", field: "title", summary: "Professional headline / role." },
-  { cmd: "email", field: "email", summary: "Contact email (rendered as a mailto link)." },
-  { cmd: "phone", field: "phone", summary: "Contact phone number." },
-  { cmd: "location", field: "location", summary: "City / location." },
-  { cmd: "website", field: "website", summary: "Personal website (rendered as a link)." },
+  {
+    cmd: "email",
+    field: "email",
+    summary: "Contact email (rendered as a mailto link).",
+    hasIcon: true,
+  },
+  { cmd: "phone", field: "phone", summary: "Contact phone number.", hasIcon: true },
+  { cmd: "location", field: "location", summary: "City / location.", hasIcon: true },
+  {
+    cmd: "website",
+    field: "website",
+    summary: "Personal website (rendered as a link).",
+    hasIcon: true,
+  },
 ];
 
-const CONTACT: CommandDefinition[] = CONTACT_FIELDS.map(({ cmd, field, summary }) => ({
-  name: cmd,
+/**
+ * Build a contact command. Icons are opt-in: the plain `\email{…}` renders the
+ * value only; the `\email-icon{…}` variant sets `icon` so the renderer prepends
+ * the glyph. `\name`/`\title` have no glyph, so they get no `-icon` variant.
+ */
+const contactCommand = (
+  cmd: string,
+  field: ContactField,
+  summary: string,
+  withIcon: boolean,
+): CommandDefinition => ({
+  name: withIcon ? `${cmd}-icon` : cmd,
   category: "meta",
   args: [{ kind: "string", name: cmd }],
-  summary,
-  example: `\\${cmd}{...}`,
+  summary: withIcon ? `${summary} Prefixed with its icon.` : summary,
+  example: withIcon ? `\\${cmd}-icon{...}` : `\\${cmd}{...}`,
   build: ({ args, utils }) =>
-    ({ type: "contact", field, value: utils.textOf(args[0]).trim() }) as Node,
-}));
+    ({
+      type: "contact",
+      field,
+      value: utils.textOf(args[0]).trim(),
+      ...(withIcon ? { icon: true } : {}),
+    }) as Node,
+});
+
+const CONTACT: CommandDefinition[] = CONTACT_FIELDS.flatMap(
+  ({ cmd, field, summary, hasIcon }) => {
+    const plain = contactCommand(cmd, field, summary, false);
+    return hasIcon ? [plain, contactCommand(cmd, field, summary, true)] : [plain];
+  },
+);
 
 /* --------------------------- resume entries --------------------------- */
 
@@ -284,6 +395,30 @@ const ICONS: CommandDefinition[] = [
     },
   },
 ];
+
+/**
+ * Per-icon `\<name>-icon{label?}` shortcuts. Icons are always opt-in: typing
+ * `\github-icon{}` renders the github glyph (equivalent to `\icon{github}`), and
+ * an optional `{label}` is rendered after it. The contact fields (email, phone,
+ * location, website) are intentionally skipped — their `-icon` variants are the
+ * contact commands above, which keep the value clickable.
+ */
+const CONTACT_ICON_NAMES = new Set(["email", "phone", "location", "website"]);
+
+const ICON_VARIANTS: CommandDefinition[] = iconNames()
+  .filter((name) => !CONTACT_ICON_NAMES.has(name))
+  .map((name) => ({
+    name: `${name}-icon`,
+    category: "inline" as const,
+    args: [{ kind: "content" as const, name: "label", optional: true }],
+    summary: `Inline ${name} icon (shortcut for \\icon{${name}}).`,
+    example: `\\${name}-icon{}`,
+    build: ({ args }) => {
+      const icon: Node = { type: "icon", name };
+      const label = args[0]?.children ?? [];
+      return label.length > 0 ? [icon, ...label] : icon;
+    },
+  }));
 
 /* ------------------------------ primitives ---------------------------- */
 /*
@@ -424,6 +559,7 @@ export function createDefaultRegistry(): CommandRegistry {
     ...CONTACT,
     ...ENTRIES,
     ...ICONS,
+    ...ICON_VARIANTS,
     ...PRIMITIVES,
   ]) {
     registry.registerCommand(def);

@@ -221,6 +221,23 @@ Struck-through text.
 \sout{deprecated} replaced
 ```
 
+### `\text[styles]{content}`
+
+Apply **several** emphasis styles at once — the one thing the single-style
+commands above can't do. List any of `bold`, `italic`, `underline`, `strike`
+(aliases: `b`, `i`, `u`, `s`, `em`, `strong`, `strikethrough`, …) inside
+`[...]`. Styles nest in the order given (first = outermost), so the example
+below is bold **and** italic. With no `[...]`, `\text{...}` is just a plain
+group, so it is always safe to use.
+
+```latex
+\text[bold, italic]{Hello}        %% → <strong><em>Hello</em></strong>
+\text[underline, strike]{Note}
+\text{plain}                      %% no styles → passes content through
+```
+
+Unknown style names are ignored with a warning; the content still renders.
+
 ### `\textcolor{color}{content}`
 
 > 🔌 _Library:_ `colors` — `\usepackage{colors}`
@@ -342,25 +359,33 @@ A second-level section heading.
 
 These single-value commands populate the document header. When they appear
 before the first `\section`, the renderer groups `\name`/`\title` and the contact
-items into a `<header>`. `\email`, `\phone`, and `\website` render as links with
-an icon.
+items into a `<header>`. `\email`, `\phone`, and `\website` render as links; by
+default they show **no icon**.
 
-| Command            | Field      | Description                                  |
-| ------------------ | ---------- | -------------------------------------------- |
-| `\name{...}`       | `name`     | Your full name (document header).            |
-| `\title{...}`      | `title`    | Professional headline / role.                |
-| `\email{...}`      | `email`    | Contact email (rendered as a `mailto:` link).|
-| `\phone{...}`      | `phone`    | Contact phone number (rendered as a `tel:` link). |
-| `\location{...}`   | `location` | City / location (rendered with a pin icon).  |
-| `\website{...}`    | `website`  | Personal website (rendered as a link).       |
+Icons are opt-in. Each icon-bearing field has an `-icon` variant
+(`\email-icon`, `\phone-icon`, `\location-icon`, `\website-icon`) that prepends
+the glyph. Same field, same value — the only difference is the leading icon.
+
+| Command               | Field      | Description                                  |
+| --------------------- | ---------- | -------------------------------------------- |
+| `\name{...}`          | `name`     | Your full name (document header).            |
+| `\title{...}`         | `title`    | Professional headline / role.                |
+| `\email{...}`         | `email`    | Contact email (rendered as a `mailto:` link).|
+| `\email-icon{...}`    | `email`    | Same, with a leading ✉ icon.                 |
+| `\phone{...}`         | `phone`    | Contact phone number (rendered as a `tel:` link). |
+| `\phone-icon{...}`    | `phone`    | Same, with a leading ☎ icon.                 |
+| `\location{...}`      | `location` | City / location.                             |
+| `\location-icon{...}` | `location` | Same, with a leading 📍 pin icon.            |
+| `\website{...}`       | `website`  | Personal website (rendered as a link).       |
+| `\website-icon{...}`  | `website`  | Same, with a leading 🌐 icon.                |
 
 ```latex
 \name{Grace Hopper}
 \title{Distinguished Engineer}
-\email{grace@example.com}
-\phone{+1 (555) 010-1999}
-\location{Arlington, VA}
-\website{https://gracehopper.dev}
+\email-icon{grace@example.com}   %% with icon
+\phone-icon{+1 (555) 010-1999}
+\location-icon{Arlington, VA}
+\website{https://gracehopper.dev}   %% no icon
 ```
 
 ---
@@ -495,11 +520,24 @@ Center-align the contained block content.
 
 ## Icons
 
+Icons are always opt-in: they appear only where you explicitly ask for one.
+
 `\icon{name}` renders an inline SVG that inherits the surrounding text color.
 Unknown names produce an informational diagnostic and a graceful empty fallback.
 
 ```latex
 \icon{github} \href{https://github.com/you}{GitHub}
+```
+
+Every built-in icon also has a `\<name>-icon{label?}` shortcut — `\github-icon{}`
+is the same as `\icon{github}`, and an optional `{label}` is rendered after the
+glyph. (For the contact fields email/phone/location/website, the `-icon` form is
+the contact command — see [Résumé header / contact](#résumé-header--contact) —
+so the value stays a clickable link.)
+
+```latex
+\github-icon{} \href{https://github.com/you}{GitHub}
+\linkedin-icon{in/you}
 ```
 
 ### Built-in icon names

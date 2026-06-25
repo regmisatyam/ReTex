@@ -211,6 +211,12 @@ export interface ContactNode extends NodeBase {
   type: "contact";
   field: ContactField;
   value: string;
+  /**
+   * Whether to render the field's leading icon. Icons are opt-in: the plain
+   * command (`\email{…}`) renders no icon, while its `-icon` variant
+   * (`\email-icon{…}`) sets this so the renderer prepends the glyph.
+   */
+  icon?: boolean;
 }
 
 /** Parsed `key=value` map preserving per-field source ranges. */

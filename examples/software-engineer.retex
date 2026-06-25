@@ -8,11 +8,11 @@
 \name{Jane Doe}
 \title{Senior Software Engineer}
 
-\icon{email} \email{jane@example.com}
-\icon{phone} \phone{+1 (555) 010-0192}
-\icon{location} \location{San Francisco, CA}
-\icon{github} \href{https://github.com/janedoe}{github.com/janedoe}
-\icon{linkedin} \href{https://linkedin.com/in/janedoe}{in/janedoe}
+\email-icon{jane@example.com}
+\phone-icon{+1 (555) 010-0192}
+\location-icon{San Francisco, CA}
+\github-icon{} \href{https://github.com/janedoe}{github.com/janedoe}
+\linkedin-icon{} \href{https://linkedin.com/in/janedoe}{in/janedoe}
 
 \section{Summary}
 

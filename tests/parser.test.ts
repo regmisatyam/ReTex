@@ -24,6 +24,29 @@ describe("parser — typography", () => {
     expect(first("\\underline{Hi}").type).toBe("underline");
   });
 
+  it("combines styles with \\text[...] (first style outermost)", () => {
+    const node = first("\\text[bold, italic]{Hi}") as any;
+    expect(node.type).toBe("bold");
+    expect(node.children[0].type).toBe("italic");
+    expect(node.children[0].children[0]).toMatchObject({ type: "text", value: "Hi" });
+  });
+
+  it("accepts \\text style aliases", () => {
+    const node = first("\\text[b, i, u]{x}") as any;
+    expect(node.type).toBe("bold");
+    expect(node.children[0].type).toBe("italic");
+    expect(node.children[0].children[0].type).toBe("underline");
+  });
+
+  it("treats \\text with no [...] as a plain group", () => {
+    expect(first("\\text{plain}").type).toBe("group");
+  });
+
+  it("warns on an unknown \\text style but keeps the content", () => {
+    expect(codes("\\text[wiggly]{z}")).toContain(DiagnosticCode.UnknownCommand);
+    expect(first("\\text[wiggly]{z}").type).toBe("group");
+  });
+
   it("parses textcolor with a color and content", () => {
     const node = first("\\textcolor{#2563eb}{ACME}") as any;
     expect(node.type).toBe("color");
@@ -88,6 +111,28 @@ describe("parser — sections & resume components", () => {
       value: "Jane Doe",
     });
     expect((first("\\email{a@b.com}") as any).field).toBe("email");
+  });
+
+  it("marks contact icons as opt-in via the -icon variant", () => {
+    // Plain form carries no icon flag…
+    expect((first("\\email{a@b.com}") as any).icon).toBeUndefined();
+    // …while the -icon variant sets it (same field/value).
+    expect(first("\\email-icon{a@b.com}") as any).toMatchObject({
+      type: "contact",
+      field: "email",
+      value: "a@b.com",
+      icon: true,
+    });
+    expect((first("\\phone-icon{555}") as any).icon).toBe(true);
+    expect((first("\\location-icon{NYC}") as any).icon).toBe(true);
+    expect((first("\\website-icon{x.dev}") as any).icon).toBe(true);
+  });
+
+  it("exposes per-icon \\<name>-icon shortcuts", () => {
+    expect(first("\\github-icon{}") as any).toMatchObject({
+      type: "icon",
+      name: "github",
+    });
   });
 
   it("parses a job with key=value fields and a body", () => {

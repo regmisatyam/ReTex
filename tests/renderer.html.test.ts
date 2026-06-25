@@ -58,6 +58,29 @@ describe("html renderer — structure", () => {
     expect(html("\\icon{github}")).toContain("<svg");
   });
 
+  it("omits the contact icon for plain field commands", () => {
+    const out = html("\\email{a@b.com}\\location{NYC}");
+    expect(out).toContain('href="mailto:a@b.com"');
+    expect(out).not.toContain("<svg");
+  });
+
+  it("shows the contact icon only for the -icon variant", () => {
+    const out = html("\\email-icon{a@b.com}");
+    expect(out).toContain('href="mailto:a@b.com"');
+    expect(out).toContain("<svg");
+  });
+
+  it("renders \\<name>-icon shortcuts as inline SVG", () => {
+    expect(html("\\github-icon{}")).toContain("<svg");
+  });
+
+  it("combines styles with \\text into nested tags", () => {
+    expect(html("\\text[bold, italic]{Hi}")).toContain(
+      "<strong><em>Hi</em></strong>",
+    );
+    expect(html("\\text[underline, strike]{x}")).toContain("<u><s>x</s></u>");
+  });
+
   it("renders a full job entry", () => {
     const out = html(
       "\\job{title=Eng, company=ACME, start=2020, end=2024, location=NYC}{Did work}",

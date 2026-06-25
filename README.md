@@ -67,7 +67,8 @@ you `\usepackage{...}` exactly the styling you need — `colors`, `fonts`,
   decorative is opt-in. A document with no imports renders as a clean,
   browser-default page.
 - **Core typography** — `\textbf`, `\textit`, `\emph`, `\underline`, `\sout`,
-  `\bfseries`, `\itshape`.
+  `\bfseries`, `\itshape`, and `\text[…]{…}` to **combine** styles in one go,
+  e.g. `\text[bold, italic]{Hello}` (aliases: `b`, `i`, `u`, `s`).
 - **Libraries (`\usepackage`)** — opt into styling, LaTeX-style: `colors`
   (`\textcolor`, `\themecolor`), `fonts` (`\fontfamily`, `\fontsize`,
   `\small`…`\Huge`, `\ttfamily`), `shapes` (`\hrule`, `\dashrule`, …, `\vspace`,
@@ -79,8 +80,11 @@ you `\usepackage{...}` exactly the styling you need — `colors`, `fonts`,
   `\website`, and rich entries `\job`, `\education`, `\project`, `\skills`.
 - **Lists & layout** — `itemize`, `enumerate`, and a flexible `columns`
   environment.
-- **Icons** — inline SVG icon set (`\icon{github}`, `\icon{linkedin}`, …),
-  extensible at runtime.
+- **Icons (opt-in)** — inline SVG icon set via `\icon{github}` or the
+  per-icon shortcut `\github-icon{}`. Contact fields show **no** icon by
+  default; use the `-icon` variant (`\email-icon{…}`, `\phone-icon{…}`,
+  `\location-icon{…}`, `\website-icon{…}`) when you want the glyph. Extensible
+  at runtime.
 - **Theming** — a blank default plus opt-in presets (`modern`, `classic`,
   `compact`) and a fully data-driven, deep-mergeable custom theme model.
 - **Plugins** — register new commands, environments, icons, renderers, or theme
@@ -192,10 +196,10 @@ See [Libraries](#libraries) for the full catalog.
 %% --- header ---
 \name{Grace Hopper}
 \title{Distinguished Engineer \& Compiler Pioneer}
-\email{grace@example.com}
-\phone{+1 (555) 010-1999}
-\location{Arlington, VA}
-\website{https://gracehopper.dev}
+\email-icon{grace@example.com}   %% `-icon` variant prepends the glyph; plain \email{…} shows none
+\phone-icon{+1 (555) 010-1999}
+\location-icon{Arlington, VA}
+\website-icon{https://gracehopper.dev}
 
 \section{Summary}
 Systems engineer with 30+ years building compilers and developer tools.

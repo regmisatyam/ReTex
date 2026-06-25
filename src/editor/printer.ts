@@ -138,7 +138,7 @@ function printNode(node: Node): string {
     case "usepackage":
       return `\\usepackage{${node.names.join(", ")}}`;
     case "contact":
-      return `\\${node.field}{${node.value}}`;
+      return `\\${node.field}${node.icon ? "-icon" : ""}{${node.value}}`;
     case "space":
       return `\\${node.axis === "vertical" ? "vspace" : "hspace"}{${node.size}}`;
     case "command": {

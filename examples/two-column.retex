@@ -6,9 +6,9 @@
 \name{Sam Builder}
 \title{Full-Stack Developer & Designer}
 
-\icon{github} \href{https://github.com/sambuilder}{sambuilder}
-\icon{website} \website{https://sambuilder.dev}
-\icon{email} \email{sam@builder.dev}
+\github-icon{} \href{https://github.com/sambuilder}{sambuilder}
+\website-icon{https://sambuilder.dev}
+\email-icon{sam@builder.dev}
 
 \section{Profile}
 

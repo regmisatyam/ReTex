@@ -26,6 +26,16 @@ describe("tokenizer", () => {
     expect(values("\\section*")).toEqual(["section*"]);
   });
 
+  it("lexes internal hyphens as part of a compound command name", () => {
+    expect(values("\\email-icon")).toEqual(["email-icon"]);
+    expect(values("\\github-icon{}")).toEqual(["github-icon", "{", "}"]);
+  });
+
+  it("keeps a trailing hyphen (not followed by a letter) as literal text", () => {
+    expect(values("\\foo-")).toEqual(["foo", "-"]);
+    expect(values("\\foo-1")).toEqual(["foo", "-1"]);
+  });
+
   it("lexes braces and brackets", () => {
     expect(types("{}[]")).toEqual([
       TokenType.LBrace,
