@@ -1,15 +1,15 @@
 /**
- * Render every `examples/*.retex` file to a standalone HTML document in
- * `examples/rendered/`. Run with:  `npx tsx examples/build.ts`
+ * Render the examples to standalone HTML in `examples/rendered/`:
  *
- * The examples are self-styling: each one imports a theme/library with
- * `\usepackage{...}`, so the engine needs no theme configuration here — it just
- * compiles and renders, and the imported libraries do the rest.
+ *  - every `examples/*.retex` file, styled by the libraries it imports
+ *  - `examples/ai-response.md`, once in each paper style
+ *
+ * Run with:  `npx tsx examples/build.ts`
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ReTeXEngine, DiagnosticSeverity } from "../src/index.js";
+import { ReTeXEngine, DiagnosticSeverity, paperStyleNames } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = join(here, "rendered");
@@ -32,7 +32,20 @@ for (const file of files) {
     process.exitCode = 1;
   }
 
-  const html = engine.toHtmlDocument(source, { title: name });
+  const html = engine.toHtmlDocument(source);
   writeFileSync(join(outDir, `${name}.html`), html, "utf8");
   console.log(`✓ ${file} → rendered/${name}.html (${html.length} bytes)`);
+}
+
+// The sample's image sits next to it, one level above the rendered pages.
+const answer = readFileSync(join(here, "ai-response.md"), "utf8").replaceAll(
+  "](sparse-attention.png",
+  "](../sparse-attention.png",
+);
+for (const style of paperStyleNames()) {
+  const engine = new ReTeXEngine();
+  const { ast } = engine.fromMarkdown(answer, { style });
+  const html = engine.toHtmlDocument(ast);
+  writeFileSync(join(outDir, `ai-response-${style}.html`), html, "utf8");
+  console.log(`✓ ai-response.md → rendered/ai-response-${style}.html (${html.length} bytes)`);
 }

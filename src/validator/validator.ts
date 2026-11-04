@@ -6,7 +6,8 @@ import {
   type DocumentNode,
   type Theme,
 } from "../types/index.js";
-import { walk } from "../ast/walk.js";
+import { walk, collect } from "../ast/walk.js";
+import { texToMathML } from "../math/index.js";
 
 export interface ValidateOptions {
   /** When provided, `\themecolor{token}` tokens are checked against it. */
@@ -28,9 +29,46 @@ export function validate(ast: DocumentNode, options: ValidateOptions = {}): Diag
     diagnostics.push({ ...d, source: "validator" });
   };
 
+  const bibKeys = new Set(
+    collect(ast, (n) => n.type === "bibitem").map((n) =>
+      n.type === "bibitem" ? n.key : "",
+    ),
+  );
+
   walk(ast, {
-    enter(node) {
+    enter(node, parent) {
       switch (node.type) {
+        case "math":
+          for (const problem of texToMathML(node.tex).errors) {
+            report({
+              severity: DiagnosticSeverity.Warning,
+              code: DiagnosticCode.UnsupportedMath,
+              message: `Formula "${node.tex.slice(0, 60)}": ${problem}`,
+              range: node.range ?? ZERO_RANGE,
+            });
+          }
+          break;
+        case "cite":
+          for (const key of node.keys) {
+            if (bibKeys.has(key)) continue;
+            report({
+              severity: DiagnosticSeverity.Warning,
+              code: DiagnosticCode.UnknownCitation,
+              message: `\\cite{${key}} has no matching \\bibitem{${key}}.`,
+              range: node.range ?? ZERO_RANGE,
+            });
+          }
+          break;
+        case "row":
+          if (parent?.type !== "table") {
+            report({
+              severity: DiagnosticSeverity.Error,
+              code: DiagnosticCode.CommandOutsideContext,
+              message: "\\row and \\head must appear inside a table environment.",
+              range: node.range ?? ZERO_RANGE,
+            });
+          }
+          break;
         case "command":
           checkStrayCommand(node, report);
           break;
@@ -102,6 +140,13 @@ function checkStrayCommand(
       severity: DiagnosticSeverity.Error,
       code: DiagnosticCode.CommandOutsideContext,
       message: "\\column must appear inside a columns environment.",
+      range: node.range ?? ZERO_RANGE,
+    });
+  } else if (node.name === "bibitem") {
+    report({
+      severity: DiagnosticSeverity.Error,
+      code: DiagnosticCode.CommandOutsideContext,
+      message: "\\bibitem must appear inside a references environment.",
       range: node.range ?? ZERO_RANGE,
     });
   }

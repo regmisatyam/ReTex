@@ -80,13 +80,17 @@ export interface GroupNode extends NodeBase {
 export interface UsePackageNode extends NodeBase {
   type: "usepackage";
   names: string[];
+  /** Written as `\documentclass{...}` rather than `\usepackage{...}`. */
+  documentClass?: boolean;
+  /** `\documentclass[twocolumn, a4paper]{...}` flags, in source order. */
+  options?: string[];
 }
 
 /* ------------------------------------------------------------------ */
 /* Typography / inline marks                                           */
 /* ------------------------------------------------------------------ */
 
-export type MarkType = "bold" | "italic" | "underline" | "strike";
+export type MarkType = "bold" | "italic" | "underline" | "strike" | "sub" | "sup";
 
 /** Simple wrapping mark such as `\textbf{...}`. */
 export interface MarkNode extends NodeBase {
@@ -164,9 +168,14 @@ export interface IconNode extends NodeBase {
 
 export interface SectionNode extends NodeBase {
   type: "section";
+  /** Plain-text title (always present, even when {@link children} is set). */
   title: string;
-  /** 1 = `\section`, 2 = `\subsection`. */
+  /** 1 = `\section`, 2 = `\subsection`, 3 = `\subsubsection`, 4 = `\paragraph`. */
   level: number;
+  /** Rich title content. Only set when the title has non-text inline markup. */
+  children?: Node[];
+  /** `\section*` — never receives an automatic number. */
+  unnumbered?: boolean;
 }
 
 export type ListKind = "itemize" | "enumerate";
@@ -175,6 +184,8 @@ export interface ListNode extends NodeBase {
   type: "list";
   kind: ListKind;
   items: ListItemNode[];
+  /** First number of an `enumerate` list, when it does not start at 1. */
+  start?: number;
 }
 
 export interface ListItemNode extends NodeBase {
@@ -204,7 +215,14 @@ export interface ColumnNode extends NodeBase {
 /* Resume / CV semantics                                               */
 /* ------------------------------------------------------------------ */
 
-export type ContactField = "name" | "title" | "email" | "phone" | "location" | "website";
+export type ContactField =
+  | "name"
+  | "title"
+  | "email"
+  | "phone"
+  | "location"
+  | "website"
+  | "date";
 
 /** One of the single-value header commands (`\name`, `\email`, …). */
 export interface ContactNode extends NodeBase {
@@ -217,6 +235,8 @@ export interface ContactNode extends NodeBase {
    * (`\email-icon{…}`) sets this so the renderer prepends the glyph.
    */
   icon?: boolean;
+  /** Rich content for `\title`. Only set when it has non-text inline markup. */
+  children?: Node[];
 }
 
 /** Parsed `key=value` map preserving per-field source ranges. */
@@ -249,6 +269,132 @@ export interface ProjectNode extends NodeBase {
 export interface SkillsNode extends NodeBase {
   type: "skills";
   items: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Paper semantics                                                     */
+/* ------------------------------------------------------------------ */
+
+/** `\author{name=…, affiliation=…, email=…}` */
+export interface AuthorNode extends NodeBase {
+  type: "author";
+  fields: FieldMap;
+}
+
+/** `\begin{abstract} … \end{abstract}` */
+export interface AbstractNode extends NodeBase {
+  type: "abstract";
+  children: Node[];
+}
+
+/** `\keywords{a, b, c}` */
+export interface KeywordsNode extends NodeBase {
+  type: "keywords";
+  items: string[];
+}
+
+/** `\code{…}` — inline verbatim code. */
+export interface InlineCodeNode extends NodeBase {
+  type: "code";
+  value: string;
+}
+
+/** `\begin{code}[python] … \end{code}` / `\begin{verbatim} … \end{verbatim}` */
+export interface CodeBlockNode extends NodeBase {
+  type: "codeblock";
+  value: string;
+  language?: string;
+}
+
+/** `\math{…}` (inline) or `\begin{equation} … \end{equation}` (display). */
+export interface MathNode extends NodeBase {
+  type: "math";
+  /** The TeX source of the formula, exactly as written. */
+  tex: string;
+  display: boolean;
+  /** `false` for `equation*`: never numbered, whatever the paper style says. */
+  numbered?: boolean;
+}
+
+/** `\begin{quote} … \end{quote}` */
+export interface QuoteNode extends NodeBase {
+  type: "quote";
+  children: Node[];
+}
+
+/** `\includegraphics[width=80%]{url}` */
+export interface ImageNode extends NodeBase {
+  type: "image";
+  /** Sanitized, render-safe URL. */
+  src: string;
+  /** Original, unsanitized URL (kept for diagnostics / round-tripping). */
+  rawSrc: string;
+  alt: string;
+  width?: string;
+}
+
+/** `\caption{…}` inside a figure or table. */
+export interface CaptionNode extends NodeBase {
+  type: "caption";
+  children: Node[];
+}
+
+/** `\begin{figure} … \end{figure}`; `wide` comes from `figure*`. */
+export interface FigureNode extends NodeBase {
+  type: "figure";
+  children: Node[];
+  /** Span every column of a multi-column layout. */
+  wide?: boolean;
+}
+
+export type TableAlign = "left" | "center" | "right";
+
+/** One cell of a {@link TableRowNode}. */
+export interface TableCellNode extends NodeBase {
+  type: "cell";
+  children: Node[];
+}
+
+/** `\row{a}{b}{c}` or, for a header row, `\head{a}{b}{c}`. */
+export interface TableRowNode extends NodeBase {
+  type: "row";
+  cells: TableCellNode[];
+  header?: boolean;
+}
+
+/** `\begin{table}[l, c, r] … \end{table}`; `wide` comes from `table*`. */
+export interface TableNode extends NodeBase {
+  type: "table";
+  rows: TableRowNode[];
+  /** Per-column alignment. Columns past the end of this list use the default. */
+  align: TableAlign[];
+  caption?: CaptionNode;
+  wide?: boolean;
+}
+
+/** `\footnote{…}` */
+export interface FootnoteNode extends NodeBase {
+  type: "footnote";
+  children: Node[];
+}
+
+/** `\cite{a, b}` */
+export interface CiteNode extends NodeBase {
+  type: "cite";
+  keys: string[];
+}
+
+/** `\bibitem{key} …` inside a {@link ReferencesNode}. */
+export interface BibItemNode extends NodeBase {
+  type: "bibitem";
+  key: string;
+  children: Node[];
+}
+
+/** `\begin{references} \bibitem{key} … \end{references}` */
+export interface ReferencesNode extends NodeBase {
+  type: "references";
+  items: BibItemNode[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,6 +462,23 @@ export type Node =
   | EducationNode
   | ProjectNode
   | SkillsNode
+  | AuthorNode
+  | AbstractNode
+  | KeywordsNode
+  | InlineCodeNode
+  | CodeBlockNode
+  | MathNode
+  | QuoteNode
+  | ImageNode
+  | CaptionNode
+  | FigureNode
+  | TableCellNode
+  | TableRowNode
+  | TableNode
+  | FootnoteNode
+  | CiteNode
+  | BibItemNode
+  | ReferencesNode
   | CommandNode
   | ErrorNode;
 
@@ -335,6 +498,8 @@ export interface NodeMap {
   italic: MarkNode;
   underline: MarkNode;
   strike: MarkNode;
+  sub: MarkNode;
+  sup: MarkNode;
   color: ColorNode;
   themecolor: ThemeColorNode;
   fontsize: FontSizeNode;
@@ -353,6 +518,23 @@ export interface NodeMap {
   education: EducationNode;
   project: ProjectNode;
   skills: SkillsNode;
+  author: AuthorNode;
+  abstract: AbstractNode;
+  keywords: KeywordsNode;
+  code: InlineCodeNode;
+  codeblock: CodeBlockNode;
+  math: MathNode;
+  quote: QuoteNode;
+  image: ImageNode;
+  caption: CaptionNode;
+  figure: FigureNode;
+  cell: TableCellNode;
+  row: TableRowNode;
+  table: TableNode;
+  footnote: FootnoteNode;
+  cite: CiteNode;
+  bibitem: BibItemNode;
+  references: ReferencesNode;
   command: CommandNode;
   error: ErrorNode;
 }

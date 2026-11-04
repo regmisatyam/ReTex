@@ -32,12 +32,16 @@ export enum DiagnosticCode {
   MissingRequiredField = "RTX3004",
   UnknownField = "RTX3005",
   EmptyArgument = "RTX3006",
+  UnknownOption = "RTX3007",
+  UnsupportedMath = "RTX3008",
 
   CommandOutsideContext = "RTX4001",
   UnknownIcon = "RTX4002",
   UnknownThemeColor = "RTX4003",
   UnknownLibrary = "RTX4004",
   LibraryRequired = "RTX4005",
+  UnknownCitation = "RTX4006",
+  MarkdownCleanup = "RTX4007",
 
   UnsafeUrlBlocked = "RTX5001",
 }
@@ -57,7 +61,7 @@ export interface Diagnostic {
   message: string;
   range: SourceRange;
   /** Stage that produced the diagnostic, for filtering. */
-  source: "tokenizer" | "parser" | "validator" | "security";
+  source: "tokenizer" | "parser" | "validator" | "security" | "markdown";
   /** Optional editor quick-fixes. */
   fixes?: QuickFix[];
 }

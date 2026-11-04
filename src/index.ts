@@ -1,11 +1,18 @@
 /**
- * ReTeX — a modern, LaTeX-inspired markup language and compiler for resumes,
- * research papers, and developer portfolios.
+ * ReTeX — a modern, LaTeX-inspired markup language and compiler for research
+ * papers, resumes, and developer portfolios.
  *
- * The quickest way in is the engine:
+ * To turn Markdown, such as an AI model's answer, into a paper:
  *
  * ```ts
- * import { ReTeXEngine } from "retex";
+ * import { markdownToHtml } from "@regmisatyam/retex";
+ * const html = markdownToHtml(answer, { style: "ieee" });
+ * ```
+ *
+ * To compile ReTeX source, use the engine:
+ *
+ * ```ts
+ * import { ReTeXEngine } from "@regmisatyam/retex";
  * const engine = new ReTeXEngine();
  * const html = engine.toHtml("\\section{Experience}\n\\job{title=Eng, company=ACME}{Did things}");
  * ```
@@ -17,6 +24,21 @@
 /* ------------------------------- engine ------------------------------ */
 export { ReTeXEngine, createEngine } from "./engine.js";
 export type { EngineOptions, CompileResult, CompileOptions } from "./engine.js";
+
+/* ------------------------------ Markdown ----------------------------- */
+export { parseMarkdown, extractFrontMatter } from "./markdown/index.js";
+export type {
+  MarkdownOptions,
+  MarkdownResult,
+  FrontMatter,
+  FrontMatterValue,
+} from "./markdown/index.js";
+export { markdownToHtml, markdownToRetex, markdownToPdf } from "./convert.js";
+export type { PaperOptions } from "./convert.js";
+
+/* -------------------------------- math ------------------------------- */
+export { texToMathML, estimateMathWidth } from "./math/index.js";
+export type { MathOptions, MathResult } from "./math/index.js";
 
 /* -------------------------------- types ------------------------------ */
 export * from "./types/index.js";
@@ -57,10 +79,14 @@ export {
   renderPrintHtml,
   renderPdf,
   pageCss,
+  paperToCss,
+  paperPageCss,
   isBlockNode,
   BLOCK_TYPES,
   toRegions,
   splitPreamble,
+  splitPaperFront,
+  equationFit,
   entryParts,
   dateRange,
 } from "./renderers/index.js";
@@ -75,7 +101,9 @@ export type {
   HtmlRenderContext,
   Region,
   PreambleParts,
+  PaperFront,
   EntryParts,
+  EquationFit,
 } from "./renderers/index.js";
 
 // React renderer (dependency-free; React is supplied by the caller).
@@ -97,6 +125,17 @@ export {
   modernTheme,
   classicTheme,
   compactTheme,
+  paperThemes,
+  paperStyleNames,
+  paperStyleSummaries,
+  applyPaperOptions,
+  normalTheme,
+  ieeeTheme,
+  acmTheme,
+  arxivTheme,
+  lncsTheme,
+  apaTheme,
+  journalTheme,
 } from "./theme/index.js";
 
 /* ------------------------------ libraries ---------------------------- */
@@ -115,6 +154,8 @@ export {
   modernLibrary,
   classicLibrary,
   compactLibrary,
+  paperLibraries,
+  createPaperStyle,
   builtinLibraries,
   builtinLibraryNames,
   getBuiltinLibrary,
@@ -126,6 +167,7 @@ export {
   libraryDiagnostics,
   usedLibraryNamesFromTokens,
   usedLibraryNamesFromAst,
+  usedDocumentOptions,
 } from "./library/index.js";
 export type { ReTeXLibrary, LibraryLookup, AppliedLibraries } from "./library/index.js";
 
@@ -138,6 +180,7 @@ export {
   escapeHtml,
   escapeAttribute,
   sanitizeUrl,
+  sanitizeImageUrl,
   isSafeColor,
   isSafeDimension,
   sanitizeStyleValue,

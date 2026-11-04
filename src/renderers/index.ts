@@ -10,8 +10,23 @@ export type { PrintOptions, PdfOptions, HeadlessBrowser, HeadlessPage } from "./
 export { isBlockNode, BLOCK_TYPES } from "./context.js";
 export type { HtmlRenderFn, HtmlRenderContext, ReactElementSpec } from "./context.js";
 
-export { toRegions, splitPreamble, entryParts, dateRange } from "./structure.js";
-export type { Region, PreambleParts, EntryParts } from "./structure.js";
+export { paperToCss, paperPageCss } from "./paper-css.js";
+
+export {
+  toRegions,
+  splitPreamble,
+  splitPaperFront,
+  entryParts,
+  dateRange,
+  equationFit,
+} from "./structure.js";
+export type {
+  Region,
+  PreambleParts,
+  PaperFront,
+  EntryParts,
+  EquationFit,
+} from "./structure.js";
 
 // Note: the React renderer is exposed via the dedicated `retex/react` entry so
 // the core bundle never imports React.

@@ -166,6 +166,9 @@ export class Parser {
       case TokenType.RBracket:
         this.advance();
         return { type: "text", value: "]", range: tok.range };
+      case TokenType.Verbatim:
+        this.advance();
+        return { type: "text", value: tok.value, range: tok.range };
       case TokenType.Comment:
       default:
         this.advance();
@@ -278,6 +281,11 @@ export class Parser {
   private parseArgs(specs: ArgSpec[]): ArgumentNode[] {
     const args: ArgumentNode[] = [];
     for (const spec of specs) {
+      if (spec.variadic) {
+        let next: ArgumentNode | null;
+        while ((next = this.parseArg(spec))) args.push(next);
+        continue;
+      }
       const arg = this.parseArg(spec);
       if (arg) {
         args.push(arg);
@@ -310,7 +318,8 @@ export class Parser {
       return { kind, children, range: { start: openTok.range.start, end } };
     }
 
-    const raw = this.readRawUntil(close);
+    const raw =
+      spec.kind === "verbatim" ? this.readVerbatimUntil(close) : this.readRawUntil(close);
     const end = this.consumeClose(close, openTok, DiagnosticCode.UnterminatedArgument);
     return { kind, children: [], raw, range: { start: openTok.range.start, end } };
   }
@@ -343,6 +352,16 @@ export class Parser {
     while (!this.at(TokenType.EOF)) {
       const t = this.peek();
       if (depth === 0 && t.type === close) break;
+      if (t.type === TokenType.Command && t.value === "textbackslash") {
+        // The one way to write a literal backslash, in a raw argument as elsewhere.
+        raw += "\\";
+        this.advance();
+        if (this.at(TokenType.LBrace) && this.peek(1).type === TokenType.RBrace) {
+          this.advance();
+          this.advance();
+        }
+        continue;
+      }
       if (t.type === TokenType.LBrace || t.type === TokenType.LBracket) {
         depth++;
       } else if (t.type === TokenType.RBrace || t.type === TokenType.RBracket) {
@@ -350,6 +369,29 @@ export class Parser {
         depth--;
       }
       raw += t.type === TokenType.Command ? `\\${t.value}` : t.value;
+      this.advance();
+    }
+    return raw;
+  }
+
+  /**
+   * Like {@link readRawUntil}, but faithful to the source: escapes keep their
+   * backslash, and only the argument's own delimiter nests. A half-open interval
+   * such as `\math{[0, 1)}` must not be read as an unclosed bracket.
+   */
+  private readVerbatimUntil(close: TokenType): string {
+    const open = close === TokenType.RBrace ? TokenType.LBrace : TokenType.LBracket;
+    let raw = "";
+    let depth = 0;
+    while (!this.at(TokenType.EOF)) {
+      const t = this.peek();
+      if (t.type === close) {
+        if (depth === 0) break;
+        depth--;
+      } else if (t.type === open) {
+        depth++;
+      }
+      raw += t.raw ?? (t.type === TokenType.Command ? `\\${t.value}` : t.value);
       this.advance();
     }
     return raw;

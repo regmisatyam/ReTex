@@ -14,29 +14,32 @@ stages, each of which threads precise `SourceRange` provenance so diagnostics an
 editor features map back to the exact bytes the author typed.
 
 ```
-  ReTeX source (string)
+  ReTeX source (string)              Markdown (string)
+        │                                  │
+        ▼                                  │
+  ┌───────────────┐                        │
+  │  Tokenizer    │  src/tokenizer         │
+  └───────────────┘                        │
+        │                                  ▼
+        ▼                          ┌───────────────┐
+  ┌───────────────┐                │  Markdown     │  src/markdown
+  │   Parser      │  src/parser    │  front end    │  → DocumentNode
+  │  (recursive   │                └───────────────┘
+  │   descent)    │                        │
+  └───────────────┘                        │
+        │                                  │
+        ▼                                  ▼
+  ┌──────────────────────────────────────────┐
+  │  Validator                                │  src/validator  →  Diagnostic[]
+  └──────────────────────────────────────────┘
         │
         ▼
-  ┌───────────────┐
-  │  Tokenizer    │  src/tokenizer        →  Token[]  + Diagnostic[]
-  └───────────────┘
-        │
+  ┌──────────────────────────────────────────┐
+  │  Renderers                                │  src/renderers  →  HTML / React / JSON / PDF
+  └──────────────────────────────────────────┘
+        │  printDocument (src/editor)
         ▼
-  ┌───────────────┐
-  │   Parser      │  src/parser           →  DocumentNode + Diagnostic[]
-  │  (recursive   │  (consults the CommandRegistry for
-  │   descent)    │   arg signatures + AST builders)
-  └───────────────┘
-        │
-        ▼
-  ┌───────────────┐
-  │  Validator    │  src/validator        →  Diagnostic[]
-  └───────────────┘
-        │
-        ▼
-  ┌───────────────┐
-  │  Renderers    │  src/renderers        →  HTML / React / JSON / PDF
-  └───────────────┘
+  ReTeX source again
 ```
 
 The `ReTeXEngine` (`src/engine.ts`) wires these together, adds an LRU compile
@@ -50,6 +53,11 @@ opt-in **libraries** (`src/library/`) activated per-document with
 engine scans for `\usepackage` directives, clones its base registry, and adds
 the requested libraries' commands; before rendering, it folds those libraries'
 theme patches into the effective theme. See [The library layer](#the-library-layer).
+
+**One document model.** Markdown is a second *front end*, not a second pipeline. It
+produces the same `DocumentNode` as the parser, so every renderer, the validator, and
+the printer work on it unchanged, and a converted document can be saved as `.retex`.
+See [The Markdown front end](#the-markdown-front-end).
 
 ---
 
@@ -427,6 +435,59 @@ safety is layered:
 
 ---
 
+## The Markdown front end
+
+`src/markdown` converts Markdown to a `DocumentNode` in three steps:
+
+1. **Blocks** (`blocks.ts`) finds structure line by line: headings, lists, tables, code,
+   math, quotes. Containers recurse on their stripped lines, with a depth limit so that
+   `>>>>…` cannot exhaust the stack. Link and footnote definitions are collected here.
+2. **Conversion** (`convert.ts`) infers what the document doesn't state: the title,
+   metadata lines, the abstract, the reference list, and heading levels (ranked, so
+   skipped levels leave no gaps). The reference list is resolved first, because `[1]`
+   in the text is only a citation if a matching entry exists.
+3. **Inlines** (`inline.ts`) parses each block's text with the CommonMark delimiter
+   algorithm over a linked list, plus math and citations. Backtracking is bounded: a
+   missed closer is remembered and bracket scans are capped, so hostile input stays linear.
+
+The style is recorded as a `\documentclass` node at the top of the tree. From there,
+the normal library machinery picks it up, so nothing downstream knows the document
+began as Markdown.
+
+Heuristics that remove or reinterpret text are deliberately narrow, and anything removed
+is reported as a `MarkdownCleanup` diagnostic. A wrong guess must leave the text in place.
+
+## Paper layout
+
+A paper style is a `Theme` with a `paper` block (`src/theme/papers.ts`), wrapped as a
+library (`src/library/themes.ts`). `\documentclass` flags go through `applyPaperOptions`
+when the engine builds its per-document bundle.
+
+When `theme.paper` is set, both renderers lay out a front matter block and a body, and
+`paperToCss` (`src/renderers/paper-css.ts`) adds the stylesheet:
+
+- **Columns** are CSS multi-column, so a browser's print engine paginates them into real
+  two-column pages.
+- **Numbers** are CSS counters, not text. The HTML and React renderers share them, and a
+  number can never drift from the document.
+- **Looks** are one block of rules per `variant`, on top of the tokens from the theme.
+
+Wide equations are the one place layout needs to know about content. Browsers cannot
+break or scale MathML, so `equationFit` estimates a formula's width from the generated
+MathML and spans or shrinks it, rather than letting it be clipped.
+
+Verbatim environments (`code`, `equation`, …) are handled by the tokenizer, which emits
+the whole body as one `Verbatim` token. TeX and code contain unbalanced braces, `%%`, and
+`\end`-like text that ordinary tokens could not survive. `isBalanced` skips these bodies
+too, so the incremental compiler never splits one at a blank line.
+
+`src/math` compiles TeX to MathML Core with a recursive-descent parser. It uses Unicode
+math ranges for fonts and inline CSS for table layout, because Core has no `mathvariant`
+or `columnalign`. Like the rest of the pipeline it never throws: unknown commands show
+their source and appear in `errors`, which the validator reports as `RTX3008`.
+
+---
+
 ## Folder structure
 
 ```
@@ -434,6 +495,21 @@ src/
 ├── index.ts              # public export surface (re-exports everything below)
 ├── engine.ts             # ReTeXEngine: wires the pipeline + cache + theme + plugins
 │
+├── convert.ts            # markdownToHtml, markdownToRetex, markdownToPdf
+│
+├── cli/
+│   ├── main.ts           # the `retex` bin
+│   └── run.ts            # argument handling, output formats, browser-based PDF
+├── markdown/
+│   ├── blocks.ts         # block structure (CommonMark + GFM)
+│   ├── inline.ts         # inline parsing: emphasis, links, math, citations, HTML
+│   ├── convert.ts        # parseMarkdown: structure inference and AI cleanup
+│   ├── frontmatter.ts    # the YAML subset for document metadata
+│   └── index.ts
+├── math/
+│   ├── mathml.ts         # texToMathML, estimateMathWidth
+│   ├── symbols.ts        # symbol tables and Unicode math fonts
+│   └── index.ts
 ├── tokenizer/
 │   ├── tokenizer.ts      # the lexer (Tokenizer, tokenize)
 │   └── index.ts
@@ -458,6 +534,7 @@ src/
 │   ├── json.ts           # renderJson, toJsonTree
 │   ├── pdf.ts            # renderPrintHtml, renderPdf, pageCss
 │   ├── css.ts            # themeToCss
+│   ├── paper-css.ts      # paperToCss, paperPageCss: layout, numbering, per-style looks
 │   ├── structure.ts      # toRegions, splitPreamble, entryParts, dateRange
 │   ├── context.ts        # render contexts, isBlockNode, BLOCK_TYPES
 │   └── index.ts
@@ -465,6 +542,7 @@ src/
 ├── theme/
 │   ├── default.ts        # blankTheme (= defaultTheme)
 │   ├── themes.ts         # resolveTheme, opt-in presets, themes map, getTheme
+│   ├── papers.ts         # paper style themes, applyPaperOptions
 │   └── index.ts
 ├── library/
 │   ├── types.ts          # ReTeXLibrary

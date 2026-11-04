@@ -1,4 +1,10 @@
-import { TokenType, type Token, type Position, type Diagnostic } from "../types/index.js";
+import {
+  TokenType,
+  verbatimEnvironmentAt,
+  type Token,
+  type Position,
+  type Diagnostic,
+} from "../types/index.js";
 
 const isLetter = (c: string): boolean => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
 
@@ -112,18 +118,56 @@ export class Tokenizer {
       }
       if (this.peek() === "*") name += this.read();
       this.push(TokenType.Command, name, start);
+      if (name === "begin") this.scanVerbatimEnvironment();
       return;
     }
 
     // Escaped literal: `\%`, `\{`, `\_`, `\ `, … → that single character.
     if (next !== "" && next !== "\n") {
       const ch = this.read();
-      this.push(TokenType.Text, ch, start);
+      this.push(TokenType.Text, ch, start, `\\${ch}`);
       return;
     }
 
     // Trailing backslash (EOF or before newline): emit as literal text.
     this.push(TokenType.Text, "\\", start);
+  }
+
+  /**
+   * After a `\begin`: if a verbatim environment follows, emit its `{name}` and
+   * `[options]` as ordinary tokens and its whole body as one Verbatim token. The
+   * closing `\end{name}` is left for the normal scanner, so the parser needs no
+   * special handling beyond accepting the new token.
+   */
+  private scanVerbatimEnvironment(): void {
+    const name = verbatimEnvironmentAt(this.src, this.offset);
+    if (name === undefined) return;
+
+    this.scanToken(); // {
+    this.pushRead(TokenType.Text, name.length);
+    this.scanToken(); // }
+
+    if (this.peek() === "[") {
+      const close = this.src.indexOf("]", this.offset);
+      const newline = this.src.indexOf("\n", this.offset);
+      if (close !== -1 && (newline === -1 || close < newline)) {
+        this.scanToken(); // [
+        if (close > this.offset) this.pushRead(TokenType.Text, close - this.offset);
+        this.scanToken(); // ]
+      }
+    }
+
+    const end = this.src.indexOf(`\\end{${name}}`, this.offset);
+    const length = (end === -1 ? this.src.length : end) - this.offset;
+    if (length > 0) this.pushRead(TokenType.Verbatim, length);
+  }
+
+  /** Read exactly `length` characters as a single token of the given type. */
+  private pushRead(type: TokenType, length: number): void {
+    const start = this.position();
+    let value = "";
+    for (let i = 0; i < length; i++) value += this.read();
+    this.push(type, value, start);
   }
 
   private scanComment(start: Position): void {
@@ -200,8 +244,10 @@ export class Tokenizer {
     return { offset: this.offset, line: this.line, column: this.column };
   }
 
-  private push(type: TokenType, value: string, start: Position): void {
-    this.tokens.push({ type, value, range: { start, end: this.position() } });
+  private push(type: TokenType, value: string, start: Position, raw?: string): void {
+    const token: Token = { type, value, range: { start, end: this.position() } };
+    if (raw !== undefined) token.raw = raw;
+    this.tokens.push(token);
   }
 }
 

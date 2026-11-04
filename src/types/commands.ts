@@ -8,8 +8,9 @@ import type { Diagnostic } from "./diagnostics.js";
  *  - `string`    — verbatim text; no command expansion (URLs, colors, sizes).
  *  - `keyval`    — `key=value, key=value` map.
  *  - `list`      — comma-separated list of trimmed strings.
+ *  - `verbatim`  — exact source text, escapes included; only braces nest (TeX, code).
  */
-export type ArgKind = "content" | "string" | "keyval" | "list";
+export type ArgKind = "content" | "string" | "keyval" | "list" | "verbatim";
 
 export interface ArgSpec {
   kind: ArgKind;
@@ -21,6 +22,8 @@ export interface ArgSpec {
    * `{...}` but may be omitted.
    */
   delimiter?: "brace" | "bracket";
+  /** Consume this spec repeatedly, for as many `{...}` groups as follow. */
+  variadic?: boolean;
   /** Human-readable name surfaced in hover docs / diagnostics. */
   name?: string;
   /** Validation hint for `string` args (drives format checks). */

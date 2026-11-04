@@ -30,6 +30,8 @@ export enum TokenType {
   LineBreak = "LineBreak",
   /** `%% ...` comment (stripped from output, surfaced to editor tooling). */
   Comment = "Comment",
+  /** The untouched body of a verbatim environment such as `code` or `equation`. */
+  Verbatim = "Verbatim",
   /** End of input. */
   EOF = "EOF",
 }
@@ -39,7 +41,35 @@ export interface Token {
   type: TokenType;
   /** The exact source text of the token (backslash stripped for commands). */
   value: string;
+  /** Original source when it differs from `value`, e.g. `\{` for the escape `{`. */
+  raw?: string;
   range: SourceRange;
+}
+
+/**
+ * Environments whose body is never tokenized: everything up to the matching
+ * `\end{name}` is one {@link TokenType.Verbatim} token, so code and TeX survive
+ * byte for byte.
+ */
+export const VERBATIM_ENVIRONMENTS: readonly string[] = [
+  "verbatim",
+  "code",
+  "equation",
+  "equation*",
+  "displaymath",
+  "align",
+  "align*",
+  "gather",
+  "gather*",
+];
+
+/** The verbatim environment named by a `{name}` at `offset`, if there is one. */
+export function verbatimEnvironmentAt(source: string, offset: number): string | undefined {
+  if (source[offset] !== "{") return undefined;
+  const close = source.indexOf("}", offset);
+  if (close === -1 || close - offset > 16) return undefined;
+  const name = source.slice(offset + 1, close);
+  return VERBATIM_ENVIRONMENTS.includes(name) ? name : undefined;
 }
 
 /** Reserved single characters that the tokenizer treats specially. */

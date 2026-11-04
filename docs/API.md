@@ -9,6 +9,7 @@ import { ReTeXEngine /* … */ } from "retex";
 import { renderReact } from "retex/react";
 ```
 
+- [Markdown](#markdown)
 - [Engine](#engine)
 - [Pipeline functions](#pipeline-functions)
 - [AST utilities](#ast-utilities)
@@ -26,6 +27,81 @@ import { renderReact } from "retex/react";
 > color, fonts, and shapes come from **[libraries](#libraries)** you activate
 > with `\usepackage{...}` in a document or `engine.use(...)` in code. The
 > `library` exports are also available from the `retex/library` subpath.
+
+---
+
+## Markdown
+
+Turn Markdown into a paper. See [the guide](MARKDOWN.md) for what each option does
+and how a document's structure is inferred.
+
+```ts
+// Quick conversions.
+function markdownToHtml(markdown: string, options?: PaperOptions): string;
+function markdownToRetex(markdown: string, options?: PaperOptions): string;
+function markdownToPdf(markdown: string, options?: PaperOptions & PdfOptions): Promise<Uint8Array>;
+
+// The AST, for any renderer. `engine.fromMarkdown` also resolves its custom styles.
+function parseMarkdown(markdown: string, options?: MarkdownOptions): MarkdownResult;
+
+interface MarkdownOptions {
+  style?: string;                     // default "normal"
+  columns?: 1 | 2;
+  pageSize?: "Letter" | "A4";
+  fontSize?: "10pt" | "11pt" | "12pt";
+  numbering?: boolean;
+  title?: string;
+  authors?: Array<string | FieldMap>;
+  abstract?: string;                  // Markdown
+  keywords?: string[];
+  date?: string;
+  stripChatter?: boolean;             // default true
+  lookupStyle?: (name: string) => PartialTheme | undefined;
+}
+
+interface MarkdownResult {
+  ast: DocumentNode;
+  diagnostics: Diagnostic[];          // cleanup, blocked URLs, unsupported math, …
+  style: string;                      // the style that was applied
+}
+
+interface PaperOptions extends MarkdownOptions {
+  engine?: ReTeXEngine;               // for custom styles and plugins
+  pageTitle?: string;                 // <title>; defaults to the paper's title
+}
+
+// Paper styles.
+const paperThemes: Record<string, Theme>;
+const paperLibraries: Record<string, ReTeXLibrary>;
+const paperStyleSummaries: Record<string, string>;
+const normalTheme, ieeeTheme, acmTheme, arxivTheme, lncsTheme, apaTheme, journalTheme: Theme;
+function paperStyleNames(): string[];
+function createPaperStyle(theme: Theme, summary?: string): ReTeXLibrary;
+function applyPaperOptions(theme: Theme, options: string[]): Theme;  // \documentclass flags
+
+// Math.
+function texToMathML(tex: string, options?: { display?: boolean }): { mathml: string; errors: string[] };
+function estimateMathWidth(mathml: string): number;  // in em
+```
+
+A theme becomes a paper style through its `paper` block:
+
+```ts
+interface ThemePaper {
+  columns?: 1 | 2;
+  columnGap?: string;
+  variant?: string;                         // built-in look, and .retex-paper--<variant>
+  numbering?: "none" | "decimal" | "ieee";
+  abstractPlacement?: "front" | "column";
+  abstractLabel?: string;
+  keywordsLabel?: string;
+  figureLabel?: string;
+  tableLabel?: string;
+  equationNumbers?: boolean;
+  lineHeight?: string;
+  textAlign?: "left" | "justify";
+}
+```
 
 ---
 
@@ -76,6 +152,7 @@ function createEngine(options?: EngineOptions): ReTeXEngine;
 | `compile`               | Tokenize → parse → (optionally) validate. **Cached** (LRU).               |
 | `parse`                 | Parse to a `DocumentNode` without validation.                             |
 | `validate`              | Diagnostics for a source string (full compile) or an existing AST.        |
+| `fromMarkdown`          | Convert Markdown to a `DocumentNode`, resolving this engine's custom styles. |
 | `toHtml`                | Render to an HTML fragment.                                               |
 | `toHtmlDocument`        | Render to a complete standalone HTML page (includes `<style>`).          |
 | `toReact`               | Render to a framework element tree; pass `createElement`/`Fragment`.      |

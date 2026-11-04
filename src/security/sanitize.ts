@@ -74,6 +74,28 @@ export function sanitizeUrl(input: string): UrlSanitizeResult {
   return { safe: "#", blocked: true, scheme };
 }
 
+/** Inline raster images only: an SVG can carry script, so it is never allowed. */
+const SAFE_DATA_IMAGE_RE = /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i;
+
+/**
+ * Sanitize a URL for use in an `<img src>`. Same policy as {@link sanitizeUrl},
+ * plus inline base64 raster images. Non-http schemes such as `mailto:` are
+ * meaningless for an image and are blocked.
+ */
+export function sanitizeImageUrl(input: string): UrlSanitizeResult {
+  const cleaned = String(input ?? "")
+    .trim()
+    .replace(CONTROL_CHARS_RE, "");
+  if (SAFE_DATA_IMAGE_RE.test(cleaned)) {
+    return { safe: cleaned, blocked: false, scheme: "data:" };
+  }
+  const result = sanitizeUrl(cleaned);
+  if (result.scheme && result.scheme !== "http:" && result.scheme !== "https:") {
+    return { safe: "", blocked: true, scheme: result.scheme };
+  }
+  return result.blocked ? { ...result, safe: "" } : result;
+}
+
 /**
  * Validate a CSS color token. Accepts `#rgb`, `#rrggbb`, `#rrggbbaa`,
  * `rgb()/rgba()/hsl()/hsla()` functional notation, and a curated set of

@@ -19,7 +19,7 @@ import type { ReTeXLibrary } from "./types.js";
 import { colorsLibrary } from "./colors.js";
 import { fontsLibrary } from "./fonts.js";
 import { shapesLibrary } from "./shapes.js";
-import { modernLibrary, classicLibrary, compactLibrary } from "./themes.js";
+import { modernLibrary, classicLibrary, compactLibrary, paperLibraries } from "./themes.js";
 
 /** Built-in libraries, keyed by their canonical (lowercase) name. */
 export const builtinLibraries: Record<string, ReTeXLibrary> = {
@@ -29,6 +29,7 @@ export const builtinLibraries: Record<string, ReTeXLibrary> = {
   modern: modernLibrary,
   classic: classicLibrary,
   compact: compactLibrary,
+  ...paperLibraries,
 };
 
 /** Convenience aliases (singular forms). */
@@ -36,13 +37,19 @@ const ALIASES: Record<string, string> = {
   color: "colors",
   font: "fonts",
   shape: "shapes",
+  article: "normal",
+  plain: "normal",
+  springer: "lncs",
+  neurips: "arxiv",
+  preprint: "arxiv",
 };
 
 /** Resolve a (possibly aliased / differently-cased) library name. */
 export function resolveLibraryName(name: string): string | undefined {
   const key = name.trim().toLowerCase();
-  if (builtinLibraries[key]) return key;
-  if (ALIASES[key]) return ALIASES[key];
+  // Names come from the document, so `constructor` must not find an inherited key.
+  if (Object.prototype.hasOwnProperty.call(builtinLibraries, key)) return key;
+  if (Object.prototype.hasOwnProperty.call(ALIASES, key)) return ALIASES[key];
   return undefined;
 }
 
@@ -63,7 +70,8 @@ export function builtinLibraryNames(): string[] {
  * library command lists so it can never drift out of sync.
  */
 export const GATED_COMMANDS: Record<string, string> = (() => {
-  const map: Record<string, string> = {};
+  // No prototype: this is queried with command names straight from the document.
+  const map = Object.create(null) as Record<string, string>;
   const add = (lib: ReTeXLibrary): void => {
     for (const c of lib.commands ?? []) map[c.name] = lib.name;
   };
@@ -90,17 +98,25 @@ export function usedLibraryNamesFromTokens(tokens: Token[]): string[] {
     const t = tokens[i]!;
     if (
       t.type !== TokenType.Command ||
-      (t.value !== "usepackage" && t.value !== "use")
+      (t.value !== "usepackage" && t.value !== "use" && t.value !== "documentclass")
     ) {
       continue;
     }
     let j = i + 1;
-    while (
-      tokens[j] &&
-      (tokens[j]!.type === TokenType.Whitespace ||
-        tokens[j]!.type === TokenType.Comment)
-    ) {
+    const skipTrivia = (): void => {
+      while (
+        tokens[j] &&
+        (tokens[j]!.type === TokenType.Whitespace ||
+          tokens[j]!.type === TokenType.Comment)
+      ) {
+        j++;
+      }
+    };
+    skipTrivia();
+    if (t.value === "documentclass" && tokens[j]?.type === TokenType.LBracket) {
+      while (tokens[j] && tokens[j]!.type !== TokenType.RBracket) j++;
       j++;
+      skipTrivia();
     }
     if (!tokens[j] || tokens[j]!.type !== TokenType.LBrace) continue;
     j++;
@@ -120,6 +136,13 @@ export function usedLibraryNamesFromTokens(tokens: Token[]): string[] {
     i = j;
   }
   return dedupe(names);
+}
+
+/** Collect `\documentclass[...]` flags from a parsed document, in source order. */
+export function usedDocumentOptions(root: Node): string[] {
+  return collect(root, (n) => n.type === "usepackage").flatMap(
+    (n) => (n as UsePackageNode).options ?? [],
+  );
 }
 
 /** Collect library names from `\usepackage` nodes in a parsed document. */

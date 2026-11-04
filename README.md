@@ -1,6 +1,6 @@
 # ReTeX
 
-**A modern, LaTeX-inspired markup language and compiler for resumes, research papers, and developer portfolios.**
+**A modern, LaTeX-inspired markup language and compiler for research papers, resumes, and developer portfolios. Paste in Markdown from an AI model and get a typeset paper back.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](https://www.typescriptlang.org/)
@@ -30,9 +30,60 @@ imposed; you add exactly what you want.
 
 ---
 
+## Markdown to research paper
+
+Most AI models answer in Markdown. ReTeX turns that into a real paper, in two columns
+or one, in the style you choose:
+
+```bash
+npx @regmisatyam/retex answer.md --style ieee -o paper.pdf
+
+pbpaste | npx @regmisatyam/retex - --style acm -o paper.pdf   # straight from the clipboard
+npx @regmisatyam/retex answer.md --style ieee -o paper.retex  # or as source to keep editing
+```
+
+```ts
+import { markdownToHtml } from "@regmisatyam/retex";
+
+const html = markdownToHtml(answer, { style: "ieee" });
+const plain = markdownToHtml(answer); // the "normal" style: one clean column
+const custom = markdownToHtml(answer, { style: "normal", columns: 2, pageSize: "A4" });
+```
+
+The same answer ([source](examples/ai-response.md)) in each style:
+
+| `ieee` | `acm` | `journal` |
+| --- | --- | --- |
+| [![ieee](examples/rendered/ai-response-ieee.png)](examples/rendered/ai-response-ieee.html) | [![acm](examples/rendered/ai-response-acm.png)](examples/rendered/ai-response-acm.html) | [![journal](examples/rendered/ai-response-journal.png)](examples/rendered/ai-response-journal.html) |
+
+| `normal` | `arxiv` | `lncs` | `apa` |
+| --- | --- | --- | --- |
+| [![normal](examples/rendered/ai-response-normal.png)](examples/rendered/ai-response-normal.html) | [![arxiv](examples/rendered/ai-response-arxiv.png)](examples/rendered/ai-response-arxiv.html) | [![lncs](examples/rendered/ai-response-lncs.png)](examples/rendered/ai-response-lncs.html) | [![apa](examples/rendered/ai-response-apa.png)](examples/rendered/ai-response-apa.html) |
+
+These reproduce the look of each family for reading and sharing. They are not the
+publishers' official templates, which a venue may still require for submission.
+
+Models rarely state a document's structure, so it is inferred:
+
+- **The paper's parts.** A lone first heading becomes the title. `**Authors:**` lines,
+  `## Abstract`, `**Keywords:**`, and `## References` become what they say. `[1]` in
+  the text links to the reference it names.
+- **Numbering.** Sections, figures, tables, and equations are numbered for you, and
+  the `1.` in `## 1. Introduction` is removed so it doesn't come out as "I. 1. INTRODUCTION".
+- **Math.** `$x^2$`, `\(x^2\)`, `$$…$$`, and `\[…\]` all work, compiled to native MathML with
+  nothing to load. `$5 and $10` stays as prices.
+- **Fit.** A table or equation too wide for its column spans the page rather than being
+  cut off.
+- **Cleanup.** "Sure! Here's your paper:", "Let me know if…", `【4†source】`, and emoji in
+  headings are removed, and every removal is reported. `--keep-chatter` turns this off.
+
+Try it live with `npm run playground`, and see **[the full guide](docs/MARKDOWN.md)**.
+
+---
+
 ## Preview
 
-The three [examples](examples/) rendered to HTML. Each opts into a theme pack
+The first three [examples](examples/) rendered to HTML. Each opts into a theme pack
 with a single `\usepackage{...}` line (`modern`, `compact`, `classic`).
 Regenerate with `npx tsx examples/build.ts`.
 
@@ -44,15 +95,17 @@ Regenerate with `npx tsx examples/build.ts`.
 
 ## What ReTeX is — and is not
 
-ReTeX **is** a focused markup language for *documents about people and projects*:
-résumés, CVs, academic bio pages, and developer portfolios. It ships a curated
-set of commands (`\name`, `\job`, `\education`, `\skills`, `\section`, …), strong
-theming, and four production-ready renderers.
+ReTeX **is** a focused markup language for *research papers and documents about
+people and projects*: papers, résumés, CVs, academic bio pages, and developer
+portfolios. It ships a curated set of commands (`\title`, `\author`, `\cite`, `\math`,
+`\job`, `\education`, `\section`, …), strong theming, and four production-ready
+renderers.
 
-ReTeX **is not** a full LaTeX implementation. There is no math mode, no macro
-programming, no `\def`. The syntax is *LaTeX-inspired* — familiar braces and
-backslash commands — but the language is deliberately small, safe, and
-predictable. (Notably, `%` is a literal percent sign, not a comment;
+ReTeX **is not** a full LaTeX implementation. There is no macro programming and no
+`\def`, and math is the common subset rather than all of TeX. The syntax is
+*LaTeX-inspired* — familiar braces and backslash commands — but the language is
+deliberately small, safe, and predictable. (Notably, `%` is a literal percent sign,
+not a comment, and `$` is a literal dollar sign, not math;
 see [Syntax](docs/SYNTAX.md).)
 
 It does, however, borrow LaTeX's best idea: **packages**. The core is blank, and
@@ -63,6 +116,16 @@ you `\usepackage{...}` exactly the styling you need — `colors`, `fonts`,
 
 ## Features
 
+- **Markdown to paper** — convert Markdown, including AI answers, into a paper in any
+  style. See [the guide](docs/MARKDOWN.md).
+- **Paper styles** — `normal`, `ieee`, `acm`, `journal`, `arxiv`, `lncs`, `apa`, chosen
+  with `\documentclass{...}` and adjustable with flags like `[onecolumn, a4paper]`.
+- **Paper commands** — `\title`, `\author`, `abstract`, `\keywords`, `equation`, `\math`,
+  `table`, `figure`, `code`, `quote`, `\footnote`, `\cite`, `references`, and automatic
+  numbering of sections, figures, tables, and equations.
+- **Math with no dependencies** — TeX compiles to native MathML, which every current
+  browser renders.
+- **Command line** — `retex paper.md --style ieee -o paper.pdf`.
 - **Blank by default** — the core ships structure + basic emphasis; everything
   decorative is opt-in. A document with no imports renders as a clean,
   browser-default page.
@@ -121,6 +184,10 @@ npm install react
 PDF export lazily imports `puppeteer` if present; otherwise you can supply your
 own headless-browser launcher (Playwright, a pooled Chromium, etc.) or print the
 generated HTML to PDF in the browser.
+
+The package includes a `retex` command, so `npx @regmisatyam/retex --help` works
+without installing anything. Its PDF output uses any Chrome, Edge, or Chromium you
+already have.
 
 The package exposes three entry points:
 
@@ -402,6 +469,7 @@ engine.toHtml("\\textcolor{#2563eb}{Hi} \\hrule");
 | `fontsLibrary`                   | `fonts`          | `\fontfamily`, `\fontsize`, `\small`…`\Huge`, `\normalsize`, `\ttfamily`, plus `fontStacks` / `fontTheme` |
 | `shapesLibrary`                  | `shapes`         | `\hrule`, `\divider`, `\dashrule`, `\dotrule`, `\thickrule`, `\doublerule`, `\vspace`, `\hspace` |
 | `modern` / `classic` / `compact` | same name        | A complete styled look **plus** all three toolkits above                  |
+| `normal`, `ieee`, `acm`, `journal`, `arxiv`, `lncs`, `apa` | same name, or `\documentclass{…}` | A complete [paper style](docs/MARKDOWN.md#styles) **plus** all three toolkits |
 
 Theme packs are the quickest path to a polished document: `\usepackage{modern}`
 gives you the full look *and* every styling command. Bring your own library with
@@ -587,6 +655,12 @@ ReTeX renders untrusted markup, so safety is built into every layer:
 - **CSS value vetting** — colors (`isSafeColor`) and dimensions
   (`isSafeDimension`) are validated before they reach a `style` attribute, so
   no `expression(...)` or `url(javascript:…)` can be smuggled in.
+- **No raw HTML from Markdown** — known tags are mapped or removed, and `<script>`,
+  `<style>`, and the like are removed with their content. Nothing is passed through.
+- **Generated MathML** — formulas only ever produce a fixed set of elements, with
+  every piece of source text escaped.
+- **Safe images** — `sanitizeImageUrl` allows web images, relative paths, and inline
+  raster images. Inline SVG, which can carry script, is blocked.
 - **No code execution** — the engine never uses `eval`, `Function`, or
   template-string interpolation of user input into executable contexts.
 
@@ -628,6 +702,8 @@ npm run format      # prettier
 
 ## Documentation
 
+- **[docs/MARKDOWN.md](docs/MARKDOWN.md)** — turning Markdown into a paper: styles,
+  options, what gets inferred, and the limitations.
 - **[docs/SYNTAX.md](docs/SYNTAX.md)** — the complete language reference: every
   command and environment, plus ReTeX's lexing rules.
 - **[docs/API.md](docs/API.md)** — the public TypeScript API, grouped by area.

@@ -4,12 +4,21 @@ import {
   type ParentNode,
   type ListNode,
   type ColumnsNode,
+  type TableNode,
+  type TableRowNode,
+  type ReferencesNode,
 } from "../types/ast.js";
 
 /** Return the child nodes of any node, regardless of where they're stored. */
 export function childrenOf(node: Node): Node[] {
   if (node.type === "list") return (node as ListNode).items;
   if (node.type === "columns") return (node as ColumnsNode).columns;
+  if (node.type === "row") return (node as TableRowNode).cells;
+  if (node.type === "references") return (node as ReferencesNode).items;
+  if (node.type === "table") {
+    const { caption, rows } = node as TableNode;
+    return caption ? [caption, ...rows] : rows;
+  }
   if (isParent(node)) return (node as ParentNode).children;
   return [];
 }

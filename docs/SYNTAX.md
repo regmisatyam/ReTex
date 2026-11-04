@@ -22,6 +22,7 @@ This document is the user-facing companion to the source of truth,
 - [Typography](#typography) — basic emphasis (core) + 🔌 color/fonts
 - [Hyperlinks](#hyperlinks)
 - [Sections](#sections)
+- [Research papers](#research-papers) — style, front matter, math, code, figures, tables, citations
 - [Résumé header / contact](#résumé-header--contact)
 - [Résumé entries](#résumé-entries)
 - [Lists](#lists)
@@ -168,6 +169,7 @@ unknown library name is flagged too (`RTX4004`).
 | `modern`   | `\usepackage{modern}`    | A styled look (violet accent, underlined headings) **+ all of the above** |
 | `classic`  | `\usepackage{classic}`   | A serif look with ruled headings **+ all of the above**                   |
 | `compact`  | `\usepackage{compact}`   | A dense, single-accent look **+ all of the above**                        |
+| `normal`, `ieee`, `acm`, `journal`, `arxiv`, `lncs`, `apa` | `\documentclass{ieee}` | A [paper style](#documentclassflagsstyle) **+ all of the above** |
 
 `color`, `font`, and `shape` are accepted as singular aliases for the first
 three. The theme packs (`modern`/`classic`/`compact`) bundle the full styling
@@ -338,20 +340,188 @@ A hyperlink that displays its own URL as the label.
 
 ### `\section{title}`
 
-A top-level résumé section. Top-level sections also delimit document *regions*
-for rendering.
+A top-level section. Top-level sections also delimit document *regions* for
+rendering. The title can hold inline markup, such as `\section{On \math{O(n)} time}`.
 
 ```latex
 \section{Experience}
 ```
 
-### `\subsection{title}`
+### `\subsection{title}`, `\subsubsection{title}`, `\paragraph{title}`
 
-A second-level section heading.
+Second-, third-, and fourth-level headings.
 
 ```latex
 \subsection{Open Source}
 ```
+
+### `\section*{title}`
+
+Any of the above with a `*` is never numbered by a paper style.
+
+```latex
+\section*{Acknowledgments}
+```
+
+---
+
+## Research papers
+
+All of these are in the core. A paper's look comes from `\documentclass`.
+
+```latex
+\documentclass{ieee}
+
+\title{On the Convergence of \math{k}-Sparse Attention}
+\author{name=Ada Lovelace, affiliation=Analytical Engine Lab, email=ada@example.org}
+\date{March 2026}
+
+\begin{abstract}
+  We bound the error of \math{k}-sparse attention.
+\end{abstract}
+\keywords{attention, sparsity}
+
+\section{Introduction}
+Attention costs \math{O(n^2)} \cite{vaswani2017}.
+
+\section*{References}
+\begin{references}
+  \bibitem{vaswani2017} A. Vaswani et al., 2017.
+\end{references}
+```
+
+See the complete [`examples/paper.retex`](../examples/paper.retex).
+
+### `\documentclass[flags]{style}`
+
+Chooses the paper style: `normal`, `ieee`, `acm`, `journal`, `arxiv`, `lncs`, or `apa`.
+Flags adjust it:
+
+| Flag                      | Effect                              |
+| ------------------------- | ----------------------------------- |
+| `onecolumn`, `twocolumn`  | Text columns per page               |
+| `a4paper`, `letterpaper`  | Page size                           |
+| `10pt`, `11pt`, `12pt`    | Base font size                      |
+| `numbered`, `nonumbers`   | Automatic section numbers on or off |
+
+```latex
+\documentclass[onecolumn, a4paper]{ieee}
+```
+
+Styles are libraries, so `\usepackage{ieee}` also works, and custom ones can be added
+with `engine.provideLibrary(...)`. An unknown flag is a warning (`RTX3007`).
+
+### `\title{content}`, `\date{text}`
+
+The paper's title, which can hold inline markup, and its date.
+
+### `\author{name}` or `\author{fields}`
+
+One author with fields, or several by name. Recognized fields are `name`, `department`,
+`affiliation`, `institution`, `organization`, `location`, and `email`.
+
+```latex
+\author{name=Ada Lovelace, affiliation=Analytical Engine Lab, email=ada@example.org}
+\author{Ada Lovelace, Alan Turing}
+```
+
+### `abstract`, `\keywords{a, b}`
+
+The abstract, as an environment or as `\abstract{...}`, and comma-separated keywords.
+Each style decides where they go and what they're called.
+
+```latex
+\begin{abstract}
+  We show that ...
+\end{abstract}
+\keywords{attention, sparsity}
+```
+
+### `\math{tex}`, `equation`
+
+A formula in TeX, inline or displayed. Display equations are numbered if the style
+numbers equations, except `equation*` and `displaymath`, which never are. `align` and
+`gather` (and `align*`, `gather*`) are also available. Bodies are read exactly as
+written. See [what's supported](MARKDOWN.md#math).
+
+```latex
+The cost is \math{O(n^2)}.
+
+\begin{equation}
+  \| \tilde{a} - a \|_1 \le 2 \sum_{j \notin \mathcal{T}} a_j
+\end{equation}
+```
+
+A `$` is **not** math in ReTeX source: it stays a literal dollar sign, so "Saved $2M
+and $3M" in a résumé keeps working. The Markdown converter does read `$...$` as math.
+
+### `\code{text}`, `code`, `verbatim`
+
+Inline code and code blocks. A block's body is read exactly as written, up to its
+closing `\end{code}`. Name the language in `[...]`. In inline `\code`, write `\{`, `\}`,
+`\\`, and `\%` for those literal characters.
+
+```latex
+Run \code{npm install}.
+
+\begin{code}[python]
+def f(x):
+    return {x: 1}
+\end{code}
+```
+
+### `quote`
+
+A block quotation.
+
+### `figure`, `figure*`, `\includegraphics[options]{url}`, `\caption{content}`
+
+A numbered figure. `figure*` spans all columns. Image options are `width=` and `alt=`.
+
+```latex
+\begin{figure}
+  \includegraphics[width=80%, alt=The pipeline]{pipeline.png}
+  \caption{The pipeline.}
+\end{figure}
+```
+
+### `table`, `table*`, `\head{...}{...}`, `\row{...}{...}`
+
+A table, with one `{...}` per cell. Column alignment goes in `[...]`, as `l`, `c`, or
+`r`. A `\caption` numbers the table, and `table*` spans all columns.
+
+```latex
+\begin{table}[l, r, r]
+  \caption{Discarded attention mass.}
+  \head{Dataset}{\math{k = 8}}{\math{k = 32}}
+  \row{LongBench}{0.041}{0.006}
+\end{table}
+```
+
+### `\footnote{content}`
+
+A numbered note, collected at the end of the document.
+
+### `\cite{a, b}`, `references`, `\bibitem{key}`
+
+A citation, and the numbered bibliography it links to. Numbers come from the order of
+the `\bibitem`s. `thebibliography` is an alias. A key with no `\bibitem` is a warning
+(`RTX4006`). `references` adds no heading of its own, so add a `\section*`.
+
+```latex
+As shown in \cite{turing1936}.
+
+\section*{References}
+\begin{references}
+  \bibitem{turing1936} A. Turing, On Computable Numbers, 1936.
+\end{references}
+```
+
+### Also new
+
+- `\textsubscript{x}` and `\textsuperscript{x}` (also `sub` and `sup` in `\text[...]`).
+- `\textbackslash{}`, a literal backslash, since `\\` is a line break.
+- `\begin{enumerate}[start=3]`, a numbered list that doesn't start at 1.
 
 ---
 

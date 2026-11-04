@@ -6,6 +6,10 @@ import type {
   Node,
   ColumnNode,
   ListItemNode,
+  TableAlign,
+  TableRowNode,
+  CaptionNode,
+  ArgumentNode,
   Position,
   SourceRange,
   FieldMap,
@@ -15,6 +19,9 @@ import { DiagnosticSeverity, DiagnosticCode } from "../types/diagnostics.js";
 import { CommandRegistry } from "./registry.js";
 import { parseKeyValArg, parseListArg } from "./args.js";
 import { hasIcon, iconNames } from "../icons/icons.js";
+import { flattenText } from "../ast/text.js";
+import { sanitizeImageUrl } from "../security/sanitize.js";
+import { isBlockNode } from "../renderers/context.js";
 
 /* ----------------------------- typography ----------------------------- */
 /*
@@ -27,7 +34,7 @@ import { hasIcon, iconNames } from "../icons/icons.js";
 
 const mark = (
   name: string,
-  type: "bold" | "italic" | "underline" | "strike",
+  type: MarkType,
   summary: string,
 ): CommandDefinition => ({
   name,
@@ -42,7 +49,7 @@ const mark = (
  * Style keywords accepted inside `\text[...]`, mapped to their emphasis mark.
  * Common aliases are included so `\text[b, i]` works like `\text[bold, italic]`.
  */
-const STYLE_MARKS: Record<string, MarkType> = {
+const STYLE_MARKS = Object.assign(Object.create(null) as Record<string, MarkType>, {
   bold: "bold",
   b: "bold",
   bf: "bold",
@@ -59,7 +66,11 @@ const STYLE_MARKS: Record<string, MarkType> = {
   s: "strike",
   sout: "strike",
   del: "strike",
-};
+  sub: "sub",
+  subscript: "sub",
+  sup: "sup",
+  superscript: "sup",
+} satisfies Record<string, MarkType>);
 
 const ZERO_POS: Position = { offset: 0, line: 1, column: 1 };
 const STYLE_ZERO_RANGE: SourceRange = { start: ZERO_POS, end: ZERO_POS };
@@ -110,11 +121,22 @@ const textStyled: CommandDefinition = {
 };
 
 const TYPOGRAPHY: CommandDefinition[] = [
+  {
+    // `\\\\` is a line break, so a literal backslash needs its own command.
+    name: "textbackslash",
+    category: "inline",
+    args: [{ kind: "string", name: "following", optional: true }],
+    summary: "A literal backslash character.",
+    example: "C:\\textbackslash{}Users",
+    build: ({ args }) => ({ type: "text", value: `\\${args[0]?.raw ?? ""}` }),
+  },
   mark("textbf", "bold", "Bold text."),
   mark("textit", "italic", "Italic text."),
   mark("emph", "italic", "Emphasized (italic) text."),
   mark("underline", "underline", "Underlined text."),
   mark("sout", "strike", "Struck-through text."),
+  mark("textsubscript", "sub", "Subscript text."),
+  mark("textsuperscript", "sup", "Superscript text."),
   textStyled,
 
   {
@@ -135,6 +157,19 @@ const TYPOGRAPHY: CommandDefinition[] = [
 
 /* ------------------------------ directives ---------------------------- */
 
+/** Flags accepted in `\\documentclass[...]`; applied by the paper theme helper. */
+const DOCUMENT_CLASS_OPTIONS = new Set([
+  "onecolumn",
+  "twocolumn",
+  "a4paper",
+  "letterpaper",
+  "10pt",
+  "11pt",
+  "12pt",
+  "numbered",
+  "nonumbers",
+]);
+
 const DIRECTIVES: CommandDefinition[] = [
   {
     name: "usepackage",
@@ -150,6 +185,40 @@ const DIRECTIVES: CommandDefinition[] = [
       type: "usepackage",
       names: parseListArg(args[0]?.raw ?? ""),
     }),
+  },
+  {
+    name: "documentclass",
+    category: "meta",
+    args: [
+      { kind: "list", name: "options", optional: true, delimiter: "bracket" },
+      { kind: "string", name: "style" },
+    ],
+    summary: "Choose a paper style (normal, ieee, acm, arxiv, lncs, apa, journal).",
+    documentation:
+      "Sets the look of the whole paper. Optional flags adjust the chosen style: " +
+      "`onecolumn`, `twocolumn`, `a4paper`, `letterpaper`, `10pt`, `11pt`, `12pt`, " +
+      "`numbered`, `nonumbers`.",
+    example: "\\documentclass[twocolumn, a4paper]{ieee}",
+    build: ({ args, utils, report }) => {
+      const optionArg = args.find((a) => a.kind === "optional");
+      const styleArg = args.find((a) => a.kind === "required");
+      const options = parseListArg(optionArg?.raw ?? "");
+      for (const option of options) {
+        if (DOCUMENT_CLASS_OPTIONS.has(option.toLowerCase())) continue;
+        report({
+          severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.UnknownOption,
+          message: `Unknown \\documentclass option "${option}". Use ${[...DOCUMENT_CLASS_OPTIONS].join(", ")}.`,
+          range: optionArg?.range ?? ZERO_RANGE,
+        });
+      }
+      return {
+        type: "usepackage",
+        names: parseListArg(utils.textOf(styleArg)),
+        documentClass: true,
+        ...(options.length > 0 ? { options } : {}),
+      };
+    },
   },
   {
     name: "use",
@@ -201,32 +270,53 @@ const LINKS: CommandDefinition[] = [
 
 /* ------------------------------- sections ----------------------------- */
 
-const SECTIONS: CommandDefinition[] = [
-  {
-    name: "section",
-    category: "block",
-    args: [{ kind: "string", name: "title" }],
-    summary: "A top-level resume section.",
-    example: "\\section{Experience}",
-    build: ({ args, utils }) => ({
+/** True when a title holds markup that a plain string could not represent. */
+const hasRichContent = (nodes: Node[]): boolean =>
+  nodes.some((n) => n.type !== "text" && n.type !== "group");
+
+const trimInline = (nodes: Node[]): Node[] => {
+  const out = [...nodes];
+  const blank = (n: Node | undefined): boolean =>
+    n?.type === "text" && n.value.trim() === "";
+  while (blank(out[0])) out.shift();
+  while (blank(out[out.length - 1])) out.pop();
+  return out;
+};
+
+const sectionCommand = (
+  name: string,
+  level: number,
+  summary: string,
+  unnumbered: boolean,
+): CommandDefinition => ({
+  name,
+  category: "block",
+  args: [{ kind: "content", name: "title" }],
+  summary,
+  example: `\\${name}{Experience}`,
+  build: ({ args }) => {
+    const children = trimInline(args[0]?.children ?? []);
+    return {
       type: "section",
-      title: utils.textOf(args[0]).trim(),
-      level: 1,
-    }),
+      title: flattenText(children).trim(),
+      level,
+      ...(hasRichContent(children) ? { children } : {}),
+      ...(unnumbered ? { unnumbered: true } : {}),
+    };
   },
-  {
-    name: "subsection",
-    category: "block",
-    args: [{ kind: "string", name: "title" }],
-    summary: "A second-level section heading.",
-    example: "\\subsection{Open Source}",
-    build: ({ args, utils }) => ({
-      type: "section",
-      title: utils.textOf(args[0]).trim(),
-      level: 2,
-    }),
-  },
+});
+
+const SECTION_LEVELS: Array<[string, number, string]> = [
+  ["section", 1, "A top-level section."],
+  ["subsection", 2, "A second-level section heading."],
+  ["subsubsection", 3, "A third-level section heading."],
+  ["paragraph", 4, "A fourth-level heading, for the smallest labelled unit."],
 ];
+
+const SECTIONS: CommandDefinition[] = SECTION_LEVELS.flatMap(([name, level, summary]) => [
+  sectionCommand(name, level, summary, false),
+  sectionCommand(`${name}*`, level, `${summary} Never numbered.`, true),
+]);
 
 /* --------------------------- contact / header ------------------------- */
 
@@ -253,6 +343,7 @@ const CONTACT_FIELDS: Array<{
     summary: "Personal website (rendered as a link).",
     hasIcon: true,
   },
+  { cmd: "date", field: "date", summary: "Publication date (paper header)." },
 ];
 
 /**
@@ -268,16 +359,20 @@ const contactCommand = (
 ): CommandDefinition => ({
   name: withIcon ? `${cmd}-icon` : cmd,
   category: "meta",
-  args: [{ kind: "string", name: cmd }],
+  // A paper title can hold formulas, so `\\title` parses its content.
+  args: [{ kind: field === "title" ? "content" : "string", name: cmd }],
   summary: withIcon ? `${summary} Prefixed with its icon.` : summary,
   example: withIcon ? `\\${cmd}-icon{...}` : `\\${cmd}{...}`,
-  build: ({ args, utils }) =>
-    ({
+  build: ({ args, utils }) => {
+    const children = field === "title" ? trimInline(args[0]?.children ?? []) : [];
+    return {
       type: "contact",
       field,
       value: utils.textOf(args[0]).trim(),
       ...(withIcon ? { icon: true } : {}),
-    }) as Node,
+      ...(hasRichContent(children) ? { children } : {}),
+    } as Node;
+  },
 });
 
 const CONTACT: CommandDefinition[] = CONTACT_FIELDS.flatMap(
@@ -372,6 +467,155 @@ const ENTRIES: CommandDefinition[] = [
   },
 ];
 
+/* -------------------------------- papers ------------------------------ */
+
+/** Undo the escapes `\\code{...}` needs for its own delimiters. */
+const unescapeCode = (raw: string): string => raw.replace(/\\([{}\\%])/g, "$1");
+
+const PAPER: CommandDefinition[] = [
+  {
+    name: "author",
+    category: "meta",
+    args: [{ kind: "keyval", name: "author" }],
+    summary: "A paper author: a name, or name=, affiliation=, email= fields.",
+    example: "\\author{name=Ada Lovelace, affiliation=Analytical Society, email=ada@x.org}",
+    build: ({ args }) => {
+      const raw = args[0]?.raw ?? "";
+      if (raw.includes("=")) {
+        return { type: "author", fields: parseKeyValArg(raw) };
+      }
+      // `\\author{Ada Lovelace, Alan Turing}` is shorthand for one author each.
+      return parseListArg(raw).map((name) => ({
+        type: "author" as const,
+        fields: { name },
+      }));
+    },
+  },
+  {
+    name: "abstract",
+    category: "block",
+    args: [{ kind: "content", name: "content" }],
+    summary: "The paper's abstract (also available as an environment).",
+    example: "\\abstract{We show that ...}",
+    build: ({ args }) => ({ type: "abstract", children: args[0]?.children ?? [] }),
+  },
+  {
+    name: "keywords",
+    category: "block",
+    args: [{ kind: "list", name: "keywords" }],
+    summary: "Comma-separated keywords, shown under the abstract.",
+    example: "\\keywords{compilers, type systems}",
+    build: ({ args }) => ({ type: "keywords", items: parseListArg(args[0]?.raw ?? "") }),
+  },
+  {
+    name: "code",
+    category: "inline",
+    args: [{ kind: "verbatim", name: "code" }],
+    summary: "Inline code. Write \\{, \\}, \\\\ and \\% for those literal characters.",
+    example: "\\code{npm install}",
+    build: ({ args }) => ({ type: "code", value: unescapeCode(args[0]?.raw ?? "") }),
+  },
+  {
+    name: "math",
+    category: "inline",
+    args: [{ kind: "verbatim", name: "tex" }],
+    summary: "An inline formula, written in TeX.",
+    example: "\\math{E = mc^2}",
+    build: ({ args }) => ({
+      type: "math",
+      tex: (args[0]?.raw ?? "").trim(),
+      display: false,
+    }),
+  },
+  {
+    name: "includegraphics",
+    category: "inline",
+    args: [
+      { kind: "keyval", name: "options", optional: true, delimiter: "bracket" },
+      { kind: "string", name: "url", format: "url" },
+    ],
+    summary: "An image. Options: width=, alt=.",
+    example: "\\includegraphics[width=80%, alt=Results chart]{figure.png}",
+    build: ({ args, utils, report }) => {
+      const optionArg = args.find((a) => a.kind === "optional");
+      const urlArg = args.find((a) => a.kind === "required");
+      const options = parseKeyValArg(optionArg?.raw ?? "");
+      const rawSrc = utils.textOf(urlArg).trim();
+      const { safe, blocked, scheme } = sanitizeImageUrl(rawSrc);
+      if (blocked) {
+        report({
+          severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.UnsafeUrlBlocked,
+          message: `Blocked image URL with "${scheme ?? "unknown"}" scheme.`,
+          range: urlArg?.range ?? ZERO_RANGE,
+        });
+      }
+      return {
+        type: "image",
+        src: safe,
+        rawSrc,
+        alt: options.alt ?? "",
+        ...(options.width ? { width: options.width } : {}),
+      };
+    },
+  },
+  {
+    name: "caption",
+    category: "block",
+    args: [{ kind: "content", name: "caption" }],
+    summary: "The caption of a figure or table.",
+    example: "\\caption{Accuracy by model}",
+    build: ({ args }) => ({ type: "caption", children: args[0]?.children ?? [] }),
+  },
+  {
+    name: "row",
+    category: "block",
+    args: [{ kind: "content", name: "cell", variadic: true }],
+    summary: "A table row with one {...} per cell (inside the table environment).",
+    example: "\\row{BERT}{0.92}{0.91}",
+    build: ({ args }) => tableRow(args, false),
+  },
+  {
+    name: "head",
+    category: "block",
+    args: [{ kind: "content", name: "cell", variadic: true }],
+    summary: "A table header row with one {...} per cell.",
+    example: "\\head{Model}{Accuracy}{F1}",
+    build: ({ args }) => tableRow(args, true),
+  },
+  {
+    name: "footnote",
+    category: "inline",
+    args: [{ kind: "content", name: "content" }],
+    summary: "A numbered note, collected at the end of the document.",
+    example: "\\footnote{Measured on the 2023 dataset.}",
+    build: ({ args }) => ({ type: "footnote", children: args[0]?.children ?? [] }),
+  },
+  {
+    name: "cite",
+    category: "inline",
+    args: [{ kind: "list", name: "keys" }],
+    summary: "Cite one or more \\bibitem entries by key.",
+    example: "\\cite{turing1936, church1936}",
+    build: ({ args }) => ({ type: "cite", keys: parseListArg(args[0]?.raw ?? "") }),
+  },
+  {
+    name: "bibitem",
+    category: "block",
+    args: [{ kind: "string", name: "key" }],
+    summary: "A bibliography entry (inside the references environment).",
+    example: "\\bibitem{turing1936} A. Turing, On Computable Numbers, 1936.",
+  },
+];
+
+function tableRow(args: ArgumentNode[], header: boolean): TableRowNode {
+  return {
+    type: "row",
+    cells: args.map((a) => ({ type: "cell", children: trimInline(a.children) })),
+    ...(header ? { header: true } : {}),
+  };
+}
+
 /* -------------------------------- icons ------------------------------- */
 
 const ICONS: CommandDefinition[] = [
@@ -460,6 +704,22 @@ const PRIMITIVES: CommandDefinition[] = [
 /* ----------------------------- environments --------------------------- */
 
 /**
+ * Whitespace next to a nested block separates nothing: it is only how the source
+ * was laid out. Dropping it means `\\item a` followed by a sublist on its own line
+ * gives the same document as Markdown's tight `- a` with a sublist.
+ */
+function itemChildren(content: Node[]): Node[] {
+  const blank = (n: Node | undefined): boolean =>
+    n?.type === "text" && n.value.trim() === "";
+  const block = (n: Node | undefined): boolean => n !== undefined && isBlockNode(n);
+  const out = content.filter(
+    (n, i) => !blank(n) || !(block(content[i - 1]) || block(content[i + 1])),
+  );
+  while (blank(out[out.length - 1])) out.pop();
+  return out;
+}
+
+/**
  * Full source span of an `itemCommand` entry: from the marker (`\item` /
  * `\column`) to the end of its content. Gives list items and columns a precise
  * range so source-mapped HTML (two-way preview) and `nodePathAt` can target an
@@ -489,7 +749,7 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
       items: (entries ?? []).map(
         (e): ListItemNode => ({
           type: "item",
-          children: e.content,
+          children: itemChildren(e.content),
           range: entryRange(e),
         }),
       ),
@@ -501,17 +761,21 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
     allowedChildren: ["item"],
     summary: "A numbered list.",
     example: "\\begin{enumerate}\n  \\item ...\n\\end{enumerate}",
-    build: ({ entries }) => ({
-      type: "list",
-      kind: "enumerate",
-      items: (entries ?? []).map(
-        (e): ListItemNode => ({
-          type: "item",
-          children: e.content,
-          range: entryRange(e),
-        }),
-      ),
-    }),
+    build: ({ entries, options }) => {
+      const start = Number(parseKeyValArg(options[0]?.raw ?? "").start);
+      return {
+        type: "list",
+        kind: "enumerate",
+        ...(Number.isInteger(start) && start !== 1 ? { start } : {}),
+        items: (entries ?? []).map(
+          (e): ListItemNode => ({
+            type: "item",
+            children: itemChildren(e.content),
+            range: entryRange(e),
+          }),
+        ),
+      };
+    },
   },
   {
     name: "columns",
@@ -540,6 +804,139 @@ const ENVIRONMENTS: EnvironmentDefinition[] = [
   },
 ];
 
+/** Parse a column spec such as `l, c, r` or `lcr` from an environment's `[...]`. */
+function parseTableAlign(raw: string): TableAlign[] {
+  const parts = raw.includes(",") ? parseListArg(raw) : raw.replace(/\s+/g, "").split("");
+  return parts.map((p): TableAlign => {
+    const name = p.toLowerCase();
+    if (name === "c" || name === "center") return "center";
+    if (name === "r" || name === "right") return "right";
+    return "left";
+  });
+}
+
+/** The exact text of a verbatim body, without the newlines framing it. */
+const verbatimBody = (body: Node[]): string =>
+  flattenText(body)
+    .replace(/^[ \t]*\n/, "")
+    .replace(/\n[ \t]*$/, "");
+
+const codeEnvironment = (name: string, summary: string): EnvironmentDefinition => ({
+  name,
+  summary,
+  example: `\\begin{${name}}\n...\n\\end{${name}}`,
+  build: ({ body, options }) => {
+    const language = (options[0]?.raw ?? "").trim();
+    return {
+      type: "codeblock",
+      value: verbatimBody(body),
+      ...(language ? { language } : {}),
+    };
+  },
+});
+
+const mathEnvironment = (name: string, numbered: boolean): EnvironmentDefinition => ({
+  name,
+  summary: numbered
+    ? "A display equation, numbered when the paper style numbers equations."
+    : "A display equation that is never numbered.",
+  example: `\\begin{${name}}\n  E = mc^2\n\\end{${name}}`,
+  build: ({ body }) => {
+    const tex = flattenText(body).trim();
+    const alignment = name.replace("*", "");
+    return {
+      type: "math",
+      display: true,
+      // Keep the alignment environment so `&` and `\\\\` still mean something.
+      tex:
+        alignment === "align" || alignment === "gather"
+          ? `\\begin{${alignment}}${tex}\\end{${alignment}}`
+          : tex,
+      ...(numbered ? {} : { numbered: false }),
+    };
+  },
+});
+
+const figureEnvironment = (name: string, wide: boolean): EnvironmentDefinition => ({
+  name,
+  summary: wide
+    ? "A figure spanning every column of the page."
+    : "A figure: an image and an optional \\caption.",
+  example: `\\begin{${name}}\n  \\includegraphics{plot.png}\n  \\caption{Results}\n\\end{${name}}`,
+  build: ({ body }) => ({
+    type: "figure",
+    children: body.filter((n) => n.type !== "text" || n.value.trim() !== ""),
+    ...(wide ? { wide: true } : {}),
+  }),
+});
+
+const tableEnvironment = (name: string, wide: boolean): EnvironmentDefinition => ({
+  name,
+  summary: wide
+    ? "A table spanning every column of the page."
+    : "A table: \\head and \\row lines, plus an optional \\caption.",
+  example: `\\begin{${name}}[l, r]\n  \\caption{Results}\n  \\head{Model}{F1}\n  \\row{BERT}{0.91}\n\\end{${name}}`,
+  build: ({ body, options }) => ({
+    type: "table",
+    rows: body.filter((n): n is TableRowNode => n.type === "row"),
+    align: parseTableAlign(options[0]?.raw ?? ""),
+    ...captionOf(body),
+    ...(wide ? { wide: true } : {}),
+  }),
+});
+
+const captionOf = (body: Node[]): { caption?: CaptionNode } => {
+  const caption = body.find((n): n is CaptionNode => n.type === "caption");
+  return caption ? { caption } : {};
+};
+
+const referencesEnvironment = (name: string): EnvironmentDefinition => ({
+  name,
+  itemCommand: "bibitem",
+  allowedChildren: ["bibitem"],
+  summary: "A numbered bibliography. Cite its entries with \\cite{key}.",
+  example: `\\begin{${name}}\n  \\bibitem{key} An entry.\n\\end{${name}}`,
+  build: ({ entries, utils }) => ({
+    type: "references",
+    items: (entries ?? []).map((e) => ({
+      type: "bibitem" as const,
+      key: utils.textOf(e.marker.args[0]).trim(),
+      children: e.content,
+      range: entryRange(e),
+    })),
+  }),
+});
+
+const PAPER_ENVIRONMENTS: EnvironmentDefinition[] = [
+  {
+    name: "abstract",
+    summary: "The paper's abstract.",
+    example: "\\begin{abstract}\n  We show that ...\n\\end{abstract}",
+    build: ({ body }) => ({ type: "abstract", children: body }),
+  },
+  {
+    name: "quote",
+    summary: "A block quotation.",
+    example: "\\begin{quote}\n  ...\n\\end{quote}",
+    build: ({ body }) => ({ type: "quote", children: body }),
+  },
+  codeEnvironment("code", "A code block. Name the language in [...]."),
+  codeEnvironment("verbatim", "A block of text shown exactly as written."),
+  mathEnvironment("equation", true),
+  mathEnvironment("equation*", false),
+  mathEnvironment("displaymath", false),
+  mathEnvironment("align", true),
+  mathEnvironment("align*", false),
+  mathEnvironment("gather", true),
+  mathEnvironment("gather*", false),
+  figureEnvironment("figure", false),
+  figureEnvironment("figure*", true),
+  tableEnvironment("table", false),
+  tableEnvironment("table*", true),
+  referencesEnvironment("references"),
+  referencesEnvironment("thebibliography"),
+];
+
 /**
  * Register every built-in (core) command and environment into a fresh registry.
  * The core is intentionally minimal: document structure, basic emphasis, links,
@@ -558,12 +955,15 @@ export function createDefaultRegistry(): CommandRegistry {
     ...SECTIONS,
     ...CONTACT,
     ...ENTRIES,
+    ...PAPER,
     ...ICONS,
     ...ICON_VARIANTS,
     ...PRIMITIVES,
   ]) {
     registry.registerCommand(def);
   }
-  for (const env of ENVIRONMENTS) registry.registerEnvironment(env);
+  for (const env of [...ENVIRONMENTS, ...PAPER_ENVIRONMENTS]) {
+    registry.registerEnvironment(env);
+  }
   return registry;
 }

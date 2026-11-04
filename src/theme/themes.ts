@@ -1,5 +1,6 @@
 import type { PartialTheme, Theme } from "../types/theme.js";
 import { blankTheme, defaultTheme } from "./default.js";
+import { paperThemes } from "./papers.js";
 
 /**
  * Deep-merge a partial theme over a base theme (sub-objects merged shallowly).
@@ -17,6 +18,9 @@ export function resolveTheme(partial?: PartialTheme, base: Theme = defaultTheme)
     page: { ...base.page, ...partial?.page },
     sectionStyle: partial?.sectionStyle ?? base.sectionStyle,
     headings: { ...base.headings, ...partial?.headings },
+    ...(base.paper || partial?.paper
+      ? { paper: { ...base.paper, ...partial?.paper } }
+      : {}),
   };
 }
 
@@ -119,6 +123,7 @@ export const themes: Record<string, Theme> = {
   modern: modernTheme,
   classic: classicTheme,
   compact: compactTheme,
+  ...paperThemes,
 };
 
 /** Look up a preset theme by name, falling back to the blank default. */

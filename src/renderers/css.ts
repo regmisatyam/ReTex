@@ -4,6 +4,7 @@ import {
   isSafeDimension,
   sanitizeStyleValue,
 } from "../security/sanitize.js";
+import { paperToCss } from "./paper-css.js";
 
 const tokenSafe = (s: string): string => s.replace(/[^a-zA-Z0-9_-]/g, "");
 
@@ -57,6 +58,7 @@ export function themeToCss(theme: Theme, prefix = "retex"): string {
     : "transparent";
   const skillColor = primary || "inherit";
   const linkDecoration = primary ? "none" : "underline";
+  const paper = paperToCss(theme, p);
 
   return `.${p}-resume {
 ${colorVars ? colorVars + "\n" : ""}    --${p}-primary: ${primary || "inherit"};
@@ -200,9 +202,36 @@ ${colorVars ? colorVars + "\n" : ""}    --${p}-primary: ${primary || "inherit"};
 p.${p}-para { margin: 0 0 0.45em; }
 p.${p}-para:last-child { margin-bottom: 0; }
 
+.${p}-code { font-family: var(--${p}-font-mono); font-size: 0.9em; padding: 0.05em 0.25em; border-radius: 3px; background: rgba(127,127,127,0.13); }
+.${p}-codeblock { font-family: var(--${p}-font-mono); font-size: 0.85em; line-height: 1.4; margin: 0.6em 0; padding: 0.6em 0.75em; border-radius: 4px; background: rgba(127,127,127,0.09); overflow-x: auto; }
+.${p}-codeblock code { font-family: inherit; }
+.${p}-quote { margin: 0.6em 0; padding-left: 0.9em; border-left: 2px solid var(--${p}-border); color: var(--${p}-muted); }
+.${p}-equation { display: flex; justify-content: safe center; align-items: center; margin: 0.7em 0; overflow-x: auto; break-inside: avoid; }
+.${p}-math-error { font-family: var(--${p}-font-mono); }
+math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", math; }
+.${p}-image { max-width: 100%; height: auto; }
+.${p}-figure { margin: 0.8em 0; text-align: center; break-inside: avoid; }
+.${p}-caption { font-size: var(--${p}-fs-small); margin-top: 0.4em; }
+.${p}-table-wrap { margin: 0.8em 0; overflow-x: auto; }
+.${p}-table { border-collapse: collapse; width: 100%; }
+.${p}-table caption { font-size: var(--${p}-fs-small); margin-bottom: 0.4em; text-align: left; }
+.${p}-table th, .${p}-table td { padding: 0.3em 0.6em; border-bottom: 1px solid var(--${p}-border); text-align: left; vertical-align: top; }
+.${p}-table th { font-weight: 700; }
+.${p}-abstract { margin: 0 0 0.8em; }
+.${p}-abstract-label { font-weight: 700; margin: 0 0 0.25em; }
+.${p}-keywords { margin: 0 0 0.8em; }
+.${p}-keywords-label { font-weight: 700; margin-right: 0.35em; }
+.${p}-references { list-style: none; margin: 0; padding: 0; }
+.${p}-references li { display: grid; grid-template-columns: auto 1fr; gap: 0 0.55em; margin-bottom: 0.3em; }
+.${p}-ref-body { min-width: 0; overflow-wrap: anywhere; }
+.${p}-cite a { color: inherit; text-decoration: none; }
+.${p}-footnote-ref a { text-decoration: none; }
+.${p}-footnotes { margin-top: 1em; padding-top: 0.5em; border-top: 1px solid var(--${p}-border); font-size: var(--${p}-fs-small); }
+.${p}-footnotes ol { margin: 0; padding-left: 1.4em; }
+
 @media print {
     .${p}-resume { max-width: none; margin: 0; padding: 0; }
     .${p}-section, .${p}-entry { break-inside: avoid; }
     a { color: inherit; }
-}`;
+}${paper ? "\n\n" + paper : ""}`;
 }
