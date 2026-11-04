@@ -1,7 +1,9 @@
 import { modernTheme, classicTheme, compactTheme } from "../theme/themes.js";
+import { paperThemes, paperStyleSummaries } from "../theme/papers.js";
 import { colorCommands } from "./colors.js";
 import { fontCommands } from "./fonts.js";
 import { shapeCommands } from "./shapes.js";
+import type { Theme } from "../types/theme.js";
 import type { ReTeXLibrary } from "./types.js";
 
 /**
@@ -34,3 +36,25 @@ export const compactLibrary: ReTeXLibrary = {
   theme: compactTheme,
   commands: stylingCommands,
 };
+
+/**
+ * Build a paper style from a theme. A paper style is an ordinary library, so it
+ * can be chosen with `\\documentclass{name}` or `\\usepackage{name}`, and custom
+ * ones plug in through `engine.provideLibrary(...)`.
+ */
+export function createPaperStyle(theme: Theme, summary?: string): ReTeXLibrary {
+  return {
+    name: theme.name,
+    summary: summary ?? `The "${theme.name}" paper style.`,
+    theme,
+    commands: stylingCommands,
+  };
+}
+
+/** Every built-in paper style, keyed by name. */
+export const paperLibraries: Record<string, ReTeXLibrary> = Object.fromEntries(
+  Object.entries(paperThemes).map(([name, theme]) => [
+    name,
+    createPaperStyle(theme, paperStyleSummaries[name]),
+  ]),
+);

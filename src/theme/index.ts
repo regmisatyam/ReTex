@@ -7,6 +7,19 @@ export {
   classicTheme,
   compactTheme,
 } from "./themes.js";
+export {
+  paperThemes,
+  paperStyleNames,
+  paperStyleSummaries,
+  applyPaperOptions,
+  normalTheme,
+  ieeeTheme,
+  acmTheme,
+  arxivTheme,
+  lncsTheme,
+  apaTheme,
+  journalTheme,
+} from "./papers.js";
 export type {
   Theme,
   PartialTheme,
@@ -16,4 +29,5 @@ export type {
   ThemeSpacing,
   ThemePage,
   ThemeHeadings,
+  ThemePaper,
 } from "../types/theme.js";

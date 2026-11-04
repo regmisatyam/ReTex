@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>two-column</title>
+<title>Full-Stack Developer &amp; Designer</title>
 <style>
 .retex-resume {
     --retex-color-primary: #2563eb;
@@ -154,6 +154,33 @@
 p.retex-para { margin: 0 0 0.45em; }
 p.retex-para:last-child { margin-bottom: 0; }
 
+.retex-code { font-family: var(--retex-font-mono); font-size: 0.9em; padding: 0.05em 0.25em; border-radius: 3px; background: rgba(127,127,127,0.13); }
+.retex-codeblock { font-family: var(--retex-font-mono); font-size: 0.85em; line-height: 1.4; margin: 0.6em 0; padding: 0.6em 0.75em; border-radius: 4px; background: rgba(127,127,127,0.09); overflow-x: auto; }
+.retex-codeblock code { font-family: inherit; }
+.retex-quote { margin: 0.6em 0; padding-left: 0.9em; border-left: 2px solid var(--retex-border); color: var(--retex-muted); }
+.retex-equation { display: flex; justify-content: safe center; align-items: center; margin: 0.7em 0; overflow-x: auto; break-inside: avoid; }
+.retex-math-error { font-family: var(--retex-font-mono); }
+math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", math; }
+.retex-image { max-width: 100%; height: auto; }
+.retex-figure { margin: 0.8em 0; text-align: center; break-inside: avoid; }
+.retex-caption { font-size: var(--retex-fs-small); margin-top: 0.4em; }
+.retex-table-wrap { margin: 0.8em 0; overflow-x: auto; }
+.retex-table { border-collapse: collapse; width: 100%; }
+.retex-table caption { font-size: var(--retex-fs-small); margin-bottom: 0.4em; text-align: left; }
+.retex-table th, .retex-table td { padding: 0.3em 0.6em; border-bottom: 1px solid var(--retex-border); text-align: left; vertical-align: top; }
+.retex-table th { font-weight: 700; }
+.retex-abstract { margin: 0 0 0.8em; }
+.retex-abstract-label { font-weight: 700; margin: 0 0 0.25em; }
+.retex-keywords { margin: 0 0 0.8em; }
+.retex-keywords-label { font-weight: 700; margin-right: 0.35em; }
+.retex-references { list-style: none; margin: 0; padding: 0; }
+.retex-references li { display: grid; grid-template-columns: auto 1fr; gap: 0 0.55em; margin-bottom: 0.3em; }
+.retex-ref-body { min-width: 0; overflow-wrap: anywhere; }
+.retex-cite a { color: inherit; text-decoration: none; }
+.retex-footnote-ref a { text-decoration: none; }
+.retex-footnotes { margin-top: 1em; padding-top: 0.5em; border-top: 1px solid var(--retex-border); font-size: var(--retex-fs-small); }
+.retex-footnotes ol { margin: 0; padding-left: 1.4em; }
+
 @media print {
     .retex-resume { max-width: none; margin: 0; padding: 0; }
     .retex-section, .retex-entry { break-inside: avoid; }
@@ -163,7 +190,7 @@ p.retex-para:last-child { margin-bottom: 0; }
 </head>
 <body>
 <div class="retex-resume">
-<header class="retex-header"><h1 class="retex-name">Sam Builder</h1><p class="retex-title">Full-Stack Developer &amp; Designer</p><div class="retex-contact"><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-2c-2.9.6-3.5-1.3-3.5-1.3-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.3-.3-4.8-1.2-4.8-5.2 0-1.2.4-2.1 1-2.9-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1.1a9.6 9.6 0 0 1 5 0c1.9-1.4 2.8-1.1 2.8-1.1.6 1.4.2 2.4.1 2.7.7.8 1 1.7 1 2.9 0 4-2.5 4.9-4.8 5.2.4.3.7 1 .7 2v3c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg></span><span class="retex-contact-item"><a class="retex-link" href="https://github.com/sambuilder" target="_blank" rel="noopener noreferrer">sambuilder</a></span><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.9a15.7 15.7 0 0 0-1.3-3.4A8 8 0 0 1 18.9 8ZM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4ZM4.3 14a8 8 0 0 1 0-4h3.3a17.6 17.6 0 0 0 0 4H4.3Zm.8 2h2.9a15.7 15.7 0 0 0 1.3 3.4A8 8 0 0 1 5.1 16Zm2.9-8H5.1a8 8 0 0 1 4.2-3.4A15.7 15.7 0 0 0 8 8Zm4 12c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4Zm2.3-6h-4.6a15.3 15.3 0 0 1 0-4h4.6a15.3 15.3 0 0 1 0 4Zm.4 5.4a15.7 15.7 0 0 0 1.3-3.4h2.9a8 8 0 0 1-4.2 3.4ZM16.4 14a17.6 17.6 0 0 0 0-4h3.3a8 8 0 0 1 0 4h-3.3Z"/></svg></span><a class="retex-contact-item" href="https://sambuilder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.9a15.7 15.7 0 0 0-1.3-3.4A8 8 0 0 1 18.9 8ZM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4ZM4.3 14a8 8 0 0 1 0-4h3.3a17.6 17.6 0 0 0 0 4H4.3Zm.8 2h2.9a15.7 15.7 0 0 0 1.3 3.4A8 8 0 0 1 5.1 16Zm2.9-8H5.1a8 8 0 0 1 4.2-3.4A15.7 15.7 0 0 0 8 8Zm4 12c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4Zm2.3-6h-4.6a15.3 15.3 0 0 1 0-4h4.6a15.3 15.3 0 0 1 0 4Zm.4 5.4a15.7 15.7 0 0 0 1.3-3.4h2.9a8 8 0 0 1-4.2 3.4ZM16.4 14a17.6 17.6 0 0 0 0-4h3.3a8 8 0 0 1 0 4h-3.3Z"/></svg>https://sambuilder.dev</a><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg></span><a class="retex-contact-item" href="mailto:sam@builder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg>sam@builder.dev</a></div></header>
+<header class="retex-header"><h1 class="retex-name">Sam Builder</h1><p class="retex-title">Full-Stack Developer &amp; Designer</p><div class="retex-contact"><span class="retex-contact-item"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 1.5A10.5 10.5 0 0 0 8.7 22c.5.1.7-.2.7-.5v-2c-2.9.6-3.5-1.3-3.5-1.3-.5-1.2-1.2-1.5-1.2-1.5-.9-.6.1-.6.1-.6 1 .1 1.6 1 1.6 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.3-.3-4.8-1.2-4.8-5.2 0-1.2.4-2.1 1-2.9-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1.1a9.6 9.6 0 0 1 5 0c1.9-1.4 2.8-1.1 2.8-1.1.6 1.4.2 2.4.1 2.7.7.8 1 1.7 1 2.9 0 4-2.5 4.9-4.8 5.2.4.3.7 1 .7 2v3c0 .3.2.6.7.5A10.5 10.5 0 0 0 12 1.5Z"/></svg></span><span class="retex-contact-item"><a class="retex-link" href="https://github.com/sambuilder" target="_blank" rel="noopener noreferrer">sambuilder</a></span><a class="retex-contact-item" href="https://sambuilder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.9a15.7 15.7 0 0 0-1.3-3.4A8 8 0 0 1 18.9 8ZM12 4c.8 1.1 1.5 2.5 1.9 4h-3.8c.4-1.5 1.1-2.9 1.9-4ZM4.3 14a8 8 0 0 1 0-4h3.3a17.6 17.6 0 0 0 0 4H4.3Zm.8 2h2.9a15.7 15.7 0 0 0 1.3 3.4A8 8 0 0 1 5.1 16Zm2.9-8H5.1a8 8 0 0 1 4.2-3.4A15.7 15.7 0 0 0 8 8Zm4 12c-.8-1.1-1.5-2.5-1.9-4h3.8c-.4 1.5-1.1 2.9-1.9 4Zm2.3-6h-4.6a15.3 15.3 0 0 1 0-4h4.6a15.3 15.3 0 0 1 0 4Zm.4 5.4a15.7 15.7 0 0 0 1.3-3.4h2.9a8 8 0 0 1-4.2 3.4ZM16.4 14a17.6 17.6 0 0 0 0-4h3.3a8 8 0 0 1 0 4h-3.3Z"/></svg>https://sambuilder.dev</a><a class="retex-contact-item" href="mailto:sam@builder.dev"><svg class="retex-icon" width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" role="img" aria-hidden="true" focusable="false"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2 8.6 6 8.6-6H3.4ZM20 8.2l-7.4 5.2a1 1 0 0 1-1.2 0L4 8.2V17h16V8.2Z"/></svg>sam@builder.dev</a></div></header>
 <section class="retex-section retex-section--bar"><h2 class="retex-section-title">Profile</h2><div class="retex-section-body"><p class="retex-para">Product-minded engineer who ships polished web apps end to end — from <span style="color:var(--retex-color-primary, currentColor)">design systems</span> to deploy pipelines.</p>
 <div class="retex-columns"><div class="retex-column" style="flex:0 0 62%"><h2 class="retex-subsection-title">Experience</h2>
 <div class="retex-entry retex-job"><div class="retex-entry-row"><span class="retex-entry-title">Founding Engineer</span><span class="retex-entry-dates">2022 – Present</span></div><div class="retex-entry-row"><span class="retex-entry-subtitle">Tiny Startup</span></div><div class="retex-entry-body"><p class="retex-para">First engineering hire; built the product from zero to 30k users.</p>

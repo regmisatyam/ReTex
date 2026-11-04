@@ -26,6 +26,21 @@ export function flattenText(input: Node | Node[]): string {
       case "icon":
         out += "";
         break;
+      case "code":
+      case "codeblock":
+        out += node.value;
+        break;
+      case "math":
+        out += node.tex;
+        break;
+      case "image":
+        out += node.alt;
+        break;
+      case "cite":
+        out += `[${node.keys.join(", ")}]`;
+        break;
+      case "footnote":
+        break;
       default:
         out += flattenText(childrenOf(node));
     }

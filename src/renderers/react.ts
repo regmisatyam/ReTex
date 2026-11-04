@@ -3,6 +3,7 @@ import {
   type DocumentNode,
   type SectionNode,
   type Theme,
+  type ThemePaper,
   type ListNode,
   type ColumnsNode,
   type CommandNode,
@@ -10,14 +11,25 @@ import {
 import { resolveTheme } from "../theme/themes.js";
 import {
   sanitizeUrl,
+  sanitizeImageUrl,
   isSafeColor,
   isSafeDimension,
   sanitizeStyleValue,
 } from "../security/sanitize.js";
 import { iconToSvg } from "../icons/icons.js";
+import { texToMathML } from "../math/index.js";
 import { themeToCss } from "./css.js";
+import { paperRootClasses } from "./paper-css.js";
 import { isBlockNode } from "./context.js";
-import { toRegions, splitPreamble, entryParts } from "./structure.js";
+import {
+  toRegions,
+  splitPreamble,
+  splitPaperFront,
+  entryParts,
+  authorDetails,
+  bibliographyNumbers,
+  equationFit,
+} from "./structure.js";
 
 /**
  * Minimal structural type for a JSX factory (React.createElement, Preact's `h`,
@@ -72,6 +84,10 @@ export class ReactRenderer {
   private readonly overrides: Map<string, ReactRenderFn>;
   private readonly useHeader: boolean;
   private key = 0;
+  /** Number of each `\bibitem` key, for resolving `\cite`. */
+  private bibNumbers = new Map<string, number>();
+  /** Footnote bodies met so far, rendered together at the end of the document. */
+  private footnotes: Node[][] = [];
 
   constructor(options: ReactRenderOptions) {
     if (typeof options.createElement !== "function") {
@@ -95,6 +111,10 @@ export class ReactRenderer {
 
   /** Render the document AST to a React element. */
   render(ast: DocumentNode): unknown {
+    this.bibNumbers = bibliographyNumbers(ast);
+    this.footnotes = [];
+    if (this.theme.paper) return this.renderPaper(ast, this.theme.paper);
+
     const regions = toRegions(ast.children);
     const parts: unknown[] = [];
     const preamble = regions[0]?.section ? undefined : regions.shift();
@@ -103,7 +123,119 @@ export class ReactRenderer {
       if (region.section) parts.push(this.renderSection(region.section, region.nodes));
       else parts.push(...this.renderFlow(region.nodes));
     }
+    const notes = this.renderFootnotes();
+    if (notes) parts.push(notes);
     return this.el("div", { className: this.cls("resume") }, parts);
+  }
+
+  /** A research paper: front matter above, then the body that flows into columns. */
+  private renderPaper(ast: DocumentNode, paper: ThemePaper): unknown {
+    const regions = toRegions(ast.children);
+    const preamble = regions.shift()!;
+    const front = splitPaperFront(preamble.nodes);
+
+    const head: unknown[] = [];
+    if (front.title) {
+      const title = front.title;
+      head.push(
+        this.el(
+          "h1",
+          { className: this.cls("paper-title") },
+          title.children ? this.renderInline(title.children) : [title.value],
+        ),
+      );
+    }
+    if (front.authors.length > 0) {
+      head.push(
+        this.el(
+          "div",
+          { className: this.cls("authors") },
+          front.authors.map((a) => this.renderAuthor(a)),
+        ),
+      );
+    }
+    if (front.contacts.length > 0) {
+      head.push(
+        this.el(
+          "div",
+          { className: this.cls("contact") },
+          front.contacts.map((c) => this.renderNode(c)),
+        ),
+      );
+    }
+    if (front.date) {
+      head.push(this.el("p", { className: this.cls("paper-date") }, [front.date.value]));
+    }
+
+    const summary = [...front.abstracts, ...front.keywords].map((n) => this.renderNode(n));
+    const inColumn = paper.abstractPlacement === "column";
+
+    const body: unknown[] = [];
+    if (inColumn) body.push(...summary);
+    body.push(...this.renderFlow(front.rest));
+    for (const region of regions) {
+      if (region.section) body.push(this.renderSection(region.section, region.nodes));
+      else body.push(...this.renderFlow(region.nodes));
+    }
+    const notes = this.renderFootnotes();
+    if (notes) body.push(notes);
+
+    const frontChildren = inColumn ? head : [...head, ...summary];
+    const className = [
+      this.cls("resume"),
+      ...paperRootClasses(paper, this.prefix),
+    ].join(" ");
+    return this.el("article", { className }, [
+      frontChildren.length > 0
+        ? this.el("header", { className: this.cls("paper-front") }, frontChildren)
+        : null,
+      this.el("div", { className: this.cls("paper-body") }, body),
+    ]);
+  }
+
+  private renderAuthor(node: Extract<Node, { type: "author" }>): unknown {
+    const { fields } = node;
+    const children: unknown[] = [];
+    if (fields.name) {
+      children.push(this.el("span", { className: this.cls("author-name") }, [fields.name]));
+    }
+    for (const detail of authorDetails(fields)) {
+      children.push(this.el("span", { className: this.cls("author-detail") }, [detail]));
+    }
+    if (fields.email) {
+      children.push(
+        this.contactLink(`mailto:${fields.email}`, "", fields.email, this.cls("author-email")),
+      );
+    }
+    return this.el("div", { className: this.cls("author") }, children);
+  }
+
+  /** The numbered notes collected while rendering, as a closing block. */
+  private renderFootnotes(): unknown {
+    if (this.footnotes.length === 0) return null;
+    const items: unknown[] = [];
+    // A footnote can itself contain a footnote, so the list may grow as we go.
+    for (let i = 0; i < this.footnotes.length; i++) {
+      const n = i + 1;
+      items.push(
+        this.el("li", { id: `${this.prefix}-fn-${n}` }, [
+          ...this.renderFlow(this.footnotes[i]!),
+          " ",
+          this.el(
+            "a",
+            {
+              className: this.cls("footnote-back"),
+              href: `#${this.prefix}-fnref-${n}`,
+              "aria-label": "Back to text",
+            },
+            ["↩\ufe0e"],
+          ),
+        ]),
+      );
+    }
+    return this.el("section", { className: this.cls("footnotes") }, [
+      this.el("ol", null, items),
+    ]);
   }
 
   private ctx(): ReactRenderContext {
@@ -121,19 +253,31 @@ export class ReactRenderer {
   /* --------------------------- structuring ---------------------------- */
 
   private renderSection(section: SectionNode, body: Node[]): unknown {
-    const className = this.theme.sectionStyle
-      ? `${this.cls("section")} ${this.cls("section")}--${this.theme.sectionStyle}`
-      : this.cls("section");
+    const className = [
+      this.cls("section"),
+      this.theme.sectionStyle ? `${this.cls("section")}--${this.theme.sectionStyle}` : "",
+      section.unnumbered ? `${this.cls("section")}--unnumbered` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     return this.el(
       "section",
       {
         className,
       },
       [
-        this.el("h2", { className: this.cls("section-title") }, [section.title]),
+        this.el(
+          "h2",
+          { className: this.cls("section-title") },
+          this.sectionTitle(section),
+        ),
         this.el("div", { className: this.cls("section-body") }, this.renderFlow(body)),
       ],
     );
+  }
+
+  private sectionTitle(section: SectionNode): unknown[] {
+    return section.children ? this.renderInline(section.children) : [section.title];
   }
 
   private renderPreamble(nodes: Node[]): unknown[] {
@@ -232,6 +376,76 @@ export class ReactRenderer {
         return this.el("u", null, this.renderInline(node.children));
       case "strike":
         return this.el("s", null, this.renderInline(node.children));
+      case "sub":
+        return this.el("sub", null, this.renderInline(node.children));
+      case "sup":
+        return this.el("sup", null, this.renderInline(node.children));
+      case "code":
+        return this.el("code", { className: this.cls("code") }, [node.value]);
+      case "codeblock":
+        return this.el("pre", { className: this.cls("codeblock") }, [
+          this.el(
+            "code",
+            node.language ? { className: `language-${tokenSafe(node.language)}` } : null,
+            [node.value],
+          ),
+        ]);
+      case "math":
+        return this.renderMath(node);
+      case "quote":
+        return this.el(
+          "blockquote",
+          { className: this.cls("quote") },
+          this.renderFlow(node.children),
+        );
+      case "image":
+        return this.renderImage(node);
+      case "figure":
+        return this.renderFigure(node);
+      case "caption":
+        return this.el(
+          "figcaption",
+          { className: this.cls("caption") },
+          this.renderInline(node.children),
+        );
+      case "table":
+        return this.renderTable(node);
+      case "footnote": {
+        const n = this.footnotes.push(node.children);
+        return this.el("sup", { className: this.cls("footnote-ref") }, [
+          this.el(
+            "a",
+            { id: `${this.prefix}-fnref-${n}`, href: `#${this.prefix}-fn-${n}` },
+            [String(n)],
+          ),
+        ]);
+      }
+      case "cite":
+        return this.renderCite(node);
+      case "references":
+        return this.renderReferences(node);
+      case "abstract":
+        return this.el("section", { className: this.cls("abstract") }, [
+          this.el("h2", { className: this.cls("abstract-label") }, [
+            this.theme.paper?.abstractLabel ?? "Abstract",
+          ]),
+          this.el(
+            "div",
+            { className: this.cls("abstract-body") },
+            this.renderFlow(node.children),
+          ),
+        ]);
+      case "keywords":
+        return this.el("p", { className: this.cls("keywords") }, [
+          this.el("span", { className: this.cls("keywords-label") }, [
+            this.theme.paper?.keywordsLabel ?? "Keywords",
+          ]),
+          this.el("span", { className: this.cls("keywords-list") }, [
+            node.items.join(", "),
+          ]),
+        ]);
+      case "author":
+        return this.renderAuthor(node);
       case "color": {
         const inner = this.renderInline(node.children);
         if (!node.color || !isSafeColor(node.color)) return this.frag(inner);
@@ -278,8 +492,12 @@ export class ReactRenderer {
       case "section":
         return this.el(
           `h${node.level + 1}`,
-          { className: this.cls("subsection-title") },
-          [node.title],
+          {
+            className: node.unnumbered
+              ? `${this.cls("subsection-title")} ${this.cls("subsection-title")}--unnumbered`
+              : this.cls("subsection-title"),
+          },
+          this.sectionTitle(node),
         );
       case "list":
         return this.renderList(node);
@@ -352,10 +570,139 @@ export class ReactRenderer {
 
   private renderList(node: ListNode): unknown {
     const tag = node.kind === "enumerate" ? "ol" : "ul";
+    const props: Record<string, unknown> = { className: this.cls("list") };
+    if (node.start !== undefined) props.start = node.start;
     return this.el(
       tag,
-      { className: this.cls("list") },
-      node.items.map((item) => this.el("li", null, this.renderInline(item.children))),
+      props,
+      node.items.map((item) =>
+        this.el(
+          "li",
+          null,
+          // A multi-paragraph item needs real paragraphs; a simple one stays bare.
+          item.children.some((n) => n.type === "parbreak")
+            ? this.renderFlow(item.children)
+            : this.renderInline(item.children),
+        ),
+      ),
+    );
+  }
+
+  private renderMath(node: Extract<Node, { type: "math" }>): unknown {
+    const { mathml } = texToMathML(node.tex, { display: node.display });
+    // Same escape hatch as icons: the markup is generated, with all text escaped.
+    if (!node.display) {
+      return this.el(
+        "span",
+        { className: this.cls("math"), dangerouslySetInnerHTML: { __html: mathml } },
+        [],
+      );
+    }
+    const fit = equationFit(mathml, this.theme);
+    const className = [
+      this.cls("equation"),
+      node.numbered === false ? "" : `${this.cls("equation")}--numbered`,
+      fit.wide ? `${this.cls("equation")}--wide` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const props: Record<string, unknown> = {
+      className,
+      dangerouslySetInnerHTML: { __html: mathml },
+    };
+    if (fit.scale) props.style = { fontSize: `${fit.scale}em` };
+    return this.el("div", props, []);
+  }
+
+  private renderImage(node: Extract<Node, { type: "image" }>): unknown {
+    const { safe } = sanitizeImageUrl(node.src);
+    if (!safe) return node.alt;
+    const props: Record<string, unknown> = {
+      className: this.cls("image"),
+      src: safe,
+      alt: node.alt,
+    };
+    if (node.width && isSafeDimension(node.width)) props.style = { width: node.width };
+    return this.el("img", props, []);
+  }
+
+  private renderFigure(node: Extract<Node, { type: "figure" }>): unknown {
+    const className = node.wide
+      ? `${this.cls("figure")} ${this.cls("figure")}--wide`
+      : this.cls("figure");
+    return this.el(
+      "figure",
+      { className },
+      node.children.flatMap((child) =>
+        child.type === "image" || child.type === "caption"
+          ? [this.renderNode(child)]
+          : this.renderFlow([child]),
+      ),
+    );
+  }
+
+  private renderTable(node: Extract<Node, { type: "table" }>): unknown {
+    const renderRows = (rows: typeof node.rows, tag: string): unknown[] =>
+      rows.map((row) =>
+        this.el(
+          "tr",
+          null,
+          row.cells.map((c, column) => {
+            const align = node.align[column];
+            return this.el(
+              tag,
+              align && align !== "left" ? { style: { textAlign: align } } : null,
+              this.renderInline(c.children),
+            );
+          }),
+        ),
+      );
+    const head = node.rows.filter((r) => r.header);
+    const body = node.rows.filter((r) => !r.header);
+    const className = node.wide
+      ? `${this.cls("table-wrap")} ${this.cls("table-wrap")}--wide`
+      : this.cls("table-wrap");
+    return this.el("div", { className }, [
+      this.el("table", { className: this.cls("table") }, [
+        node.caption
+          ? this.el("caption", null, this.renderInline(node.caption.children))
+          : null,
+        head.length > 0 ? this.el("thead", null, renderRows(head, "th")) : null,
+        this.el("tbody", null, renderRows(body, "td")),
+      ]),
+    ]);
+  }
+
+  private renderCite(node: Extract<Node, { type: "cite" }>): unknown {
+    const parts: unknown[] = ["["];
+    node.keys.forEach((key, i) => {
+      if (i > 0) parts.push(", ");
+      const n = this.bibNumbers.get(key);
+      parts.push(
+        n === undefined
+          ? key
+          : this.el("a", { href: `#${this.prefix}-ref-${n}` }, [String(n)]),
+      );
+    });
+    parts.push("]");
+    return this.el("span", { className: this.cls("cite") }, parts);
+  }
+
+  private renderReferences(node: Extract<Node, { type: "references" }>): unknown {
+    return this.el(
+      "ol",
+      { className: this.cls("references") },
+      node.items.map((item) => {
+        const n = this.bibNumbers.get(item.key);
+        return this.el("li", n !== undefined ? { id: `${this.prefix}-ref-${n}` } : null, [
+          this.el("span", { className: this.cls("ref-label") }, [`[${n ?? item.key}]`]),
+          this.el(
+            "span",
+            { className: this.cls("ref-body") },
+            this.renderInline(item.children),
+          ),
+        ]);
+      }),
     );
   }
 

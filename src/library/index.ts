@@ -14,7 +14,13 @@ export {
   fontTheme,
 } from "./fonts.js";
 export { shapesLibrary, shapeCommands } from "./shapes.js";
-export { modernLibrary, classicLibrary, compactLibrary } from "./themes.js";
+export {
+  modernLibrary,
+  classicLibrary,
+  compactLibrary,
+  paperLibraries,
+  createPaperStyle,
+} from "./themes.js";
 
 export {
   builtinLibraries,
@@ -28,5 +34,6 @@ export {
   libraryDiagnostics,
   usedLibraryNamesFromTokens,
   usedLibraryNamesFromAst,
+  usedDocumentOptions,
 } from "./registry.js";
 export type { LibraryLookup, AppliedLibraries } from "./registry.js";

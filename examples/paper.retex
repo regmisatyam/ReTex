@@ -1,0 +1,72 @@
+%% ReTeX example: a research paper written by hand.
+%%
+%% \documentclass picks the look. Try acm, arxiv, lncs, apa, journal, or normal,
+%% and flags like \documentclass[onecolumn, a4paper]{ieee}.
+\documentclass{ieee}
+
+\title{On the Convergence of \math{k}-Sparse Attention}
+
+\author{name=Ada Lovelace, affiliation=Analytical Engine Lab, email=ada@example.org}
+\author{name=Alan Turing, affiliation=Bletchley Institute, email=alan@example.org}
+
+\date{March 2026}
+
+\begin{abstract}
+  We prove that \math{k}-sparse attention converges to full attention as \math{k}
+  approaches the sequence length, and bound the error for finite \math{k}.
+\end{abstract}
+
+\keywords{attention, sparsity, convergence}
+
+\section{Introduction}
+
+Attention costs \math{O(n^2)} in the sequence length \math{n} \cite{vaswani2017}.
+Keeping the top \math{k} scores per query reduces this to \math{O(nk)}, a rule that
+has worked well in practice\footnote{See \href{https://example.org}{the benchmarks}.}
+but has lacked a simple analysis.
+
+\section{Analysis}
+
+\subsection{Setup}
+
+Let \math{a \in \mathbb{R}^n} be an attention distribution. Its \math{k}-sparse
+approximation \math{\tilde{a}} keeps the \math{k} largest entries and renormalizes.
+
+\begin{equation}
+  \| \tilde{a} - a \|_1 \le 2 \sum_{j \notin \mathcal{T}} a_j
+\end{equation}
+
+\subsection{The bound in practice}
+
+The discarded mass falls quickly as \math{k} grows, as Table 1 shows.
+
+\begin{table}[l, r, r]
+  \caption{Discarded attention mass by \math{k}.}
+  \head{Dataset}{\math{k = 8}}{\math{k = 32}}
+  \row{LongBench}{0.041}{0.006}
+  \row{WikiText}{0.058}{0.011}
+\end{table}
+
+A short implementation fits in a few lines:
+
+\begin{code}[python]
+def sparsify(scores, k):
+    top, index = scores.topk(k, dim=-1)
+    return top.softmax(dim=-1), index
+\end{code}
+
+\section{Conclusion}
+
+Sparse attention is safe whenever the discarded mass is small, which is the common
+case. \textit{Peaked} distributions benefit the most.
+
+\section*{Acknowledgments}
+
+We thank the reviewers for their comments.
+
+\section*{References}
+
+\begin{references}
+  \bibitem{vaswani2017} A. Vaswani et al., “Attention is all you need,”
+    in \textit{Advances in Neural Information Processing Systems}, 2017.
+\end{references}

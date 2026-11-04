@@ -10,11 +10,21 @@ export const BLOCK_TYPES = new Set<string>([
   "list",
   "columns",
   "rule",
+  "abstract",
+  "keywords",
+  "author",
+  "codeblock",
+  "quote",
+  "caption",
+  "figure",
+  "table",
+  "references",
 ]);
 
 export function isBlockNode(node: Node): boolean {
   if (BLOCK_TYPES.has(node.type)) return true;
   if (node.type === "space") return node.axis === "vertical";
+  if (node.type === "math") return node.display;
   if (node.type === "command" && node.name === "center") return true;
   return false;
 }

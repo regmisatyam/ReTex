@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparse Attention for Efficient Long-Context Language Models</title>
+<style>
+.retex-resume {
+    --retex-color-text: #000000;
+    --retex-color-muted: #333333;
+    --retex-color-primary: #000000;
+    --retex-color-secondary: #333333;
+    --retex-color-background: #ffffff;
+    --retex-color-border: #000000;
+    --retex-primary: #000000;
+    --retex-text: #000000;
+    --retex-muted: #333333;
+    --retex-border: #000000;
+    --retex-bg: #ffffff;
+    --retex-font-heading: "Times New Roman", Times, "Liberation Serif", "Nimbus Roman", serif;
+    --retex-font-body: "Times New Roman", Times, "Liberation Serif", "Nimbus Roman", serif;
+    --retex-font-mono: "Courier New", Courier, "Liberation Mono", monospace;
+    --retex-fs-base: 12pt;
+    --retex-fs-small: 0.9em;
+    --retex-fs-large: 1em;
+    --retex-fs-Large: 1.1em;
+    --retex-fs-Huge: 1.3em;
+    --retex-fs-name: 1.15em;
+    --retex-fs-section: 1em;
+    --retex-sp-section: 1em;
+    --retex-sp-item: 0;
+    --retex-section-transform: none;
+    --retex-section-tracking: normal;
+    --retex-name-tracking: normal;
+    --retex-link-decoration: none;
+    --retex-skill-bg: color-mix(in srgb, #000000 12%, transparent);
+    --retex-skill-color: #000000;
+
+    box-sizing: border-box;
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 0;
+    background: var(--retex-bg);
+    color: var(--retex-text);
+    font-family: var(--retex-font-body);
+    font-size: var(--retex-fs-base);
+    line-height: 1.45;
+}
+.retex-resume *, .retex-resume *::before, .retex-resume *::after { box-sizing: border-box; }
+
+.retex-header { margin-bottom: var(--retex-sp-section); }
+.retex-name {
+    font-family: var(--retex-font-heading);
+    font-size: var(--retex-fs-name);
+    font-weight: 700;
+    margin: 0 0 0.1em;
+    color: var(--retex-text);
+    letter-spacing: var(--retex-name-tracking);
+}
+.retex-title {
+    font-size: var(--retex-fs-large);
+    color: var(--retex-primary);
+    margin: 0 0 0.45em;
+    font-weight: 500;
+}
+.retex-contact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    font-size: var(--retex-fs-small);
+    color: var(--retex-muted);
+}
+.retex-contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    color: inherit;
+    text-decoration: none;
+}
+.retex-contact-item svg { opacity: 0.8; }
+
+.retex-section { margin-bottom: var(--retex-sp-section); break-inside: avoid; }
+.retex-section-title {
+    font-family: var(--retex-font-heading);
+    font-size: var(--retex-fs-section);
+    font-weight: 700;
+    text-transform: var(--retex-section-transform);
+    letter-spacing: var(--retex-section-tracking);
+    color: var(--retex-primary);
+    margin: 0 0 0.5em;
+}
+.retex-section--rule .retex-section-title { border-bottom: 2px solid var(--retex-border); padding-bottom: 0.2em; }
+.retex-section--underline .retex-section-title { text-decoration: underline; text-underline-offset: 3px; }
+.retex-section--bar .retex-section-title {
+    border-left: 3px solid var(--retex-primary);
+    padding-left: 0.5em;
+    border-bottom: none;
+}
+.retex-subsection-title {
+    font-family: var(--retex-font-heading);
+    font-size: var(--retex-fs-large);
+    font-weight: 600;
+    margin: 0.6em 0 0.3em;
+}
+
+.retex-entry { margin-bottom: 0.6rem; break-inside: avoid; }
+.retex-entry-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+}
+.retex-entry-title { font-weight: 700; }
+.retex-entry-subtitle { color: var(--retex-primary); font-weight: 500; }
+.retex-entry-dates, .retex-entry-location {
+    color: var(--retex-muted);
+    font-size: var(--retex-fs-small);
+    white-space: nowrap;
+}
+.retex-entry-body { margin-top: 0.15rem; }
+.retex-entry-body p { margin: 0.2em 0; }
+
+.retex-list { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; }
+.retex-list li { margin-bottom: var(--retex-sp-item); padding-left: 0.15rem; }
+
+.retex-columns { display: flex; gap: 1.5rem; align-items: flex-start; }
+.retex-column { min-width: 0; }
+
+.retex-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0.2rem 0; padding: 0; }
+.retex-skill {
+    background: var(--retex-skill-bg);
+    color: var(--retex-skill-color);
+    border-radius: 4px;
+    padding: 0.12rem 0.5rem;
+    font-size: var(--retex-fs-small);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.retex-link { color: var(--retex-primary); text-decoration: var(--retex-link-decoration); }
+.retex-link:hover { text-decoration: underline; }
+.retex-icon { display: inline-flex; vertical-align: -0.125em; }
+.retex-rule { border: none; border-top: 1px solid var(--retex-border); margin: 0.6rem 0; }
+.retex-rule--dashed { border-top-style: dashed; }
+.retex-rule--dotted { border-top-style: dotted; }
+.retex-rule--thick { border-top-width: 3px; }
+.retex-rule--double { border-top-style: double; border-top-width: 3px; }
+.retex-center { text-align: center; }
+.retex-scale-small { font-size: var(--retex-fs-small); }
+.retex-scale-large { font-size: var(--retex-fs-large); }
+.retex-scale-Large { font-size: var(--retex-fs-Large); }
+.retex-scale-Huge { font-size: var(--retex-fs-Huge); }
+p.retex-para { margin: 0 0 0.45em; }
+p.retex-para:last-child { margin-bottom: 0; }
+
+.retex-code { font-family: var(--retex-font-mono); font-size: 0.9em; padding: 0.05em 0.25em; border-radius: 3px; background: rgba(127,127,127,0.13); }
+.retex-codeblock { font-family: var(--retex-font-mono); font-size: 0.85em; line-height: 1.4; margin: 0.6em 0; padding: 0.6em 0.75em; border-radius: 4px; background: rgba(127,127,127,0.09); overflow-x: auto; }
+.retex-codeblock code { font-family: inherit; }
+.retex-quote { margin: 0.6em 0; padding-left: 0.9em; border-left: 2px solid var(--retex-border); color: var(--retex-muted); }
+.retex-equation { display: flex; justify-content: safe center; align-items: center; margin: 0.7em 0; overflow-x: auto; break-inside: avoid; }
+.retex-math-error { font-family: var(--retex-font-mono); }
+math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", math; }
+.retex-image { max-width: 100%; height: auto; }
+.retex-figure { margin: 0.8em 0; text-align: center; break-inside: avoid; }
+.retex-caption { font-size: var(--retex-fs-small); margin-top: 0.4em; }
+.retex-table-wrap { margin: 0.8em 0; overflow-x: auto; }
+.retex-table { border-collapse: collapse; width: 100%; }
+.retex-table caption { font-size: var(--retex-fs-small); margin-bottom: 0.4em; text-align: left; }
+.retex-table th, .retex-table td { padding: 0.3em 0.6em; border-bottom: 1px solid var(--retex-border); text-align: left; vertical-align: top; }
+.retex-table th { font-weight: 700; }
+.retex-abstract { margin: 0 0 0.8em; }
+.retex-abstract-label { font-weight: 700; margin: 0 0 0.25em; }
+.retex-keywords { margin: 0 0 0.8em; }
+.retex-keywords-label { font-weight: 700; margin-right: 0.35em; }
+.retex-references { list-style: none; margin: 0; padding: 0; }
+.retex-references li { display: grid; grid-template-columns: auto 1fr; gap: 0 0.55em; margin-bottom: 0.3em; }
+.retex-ref-body { min-width: 0; overflow-wrap: anywhere; }
+.retex-cite a { color: inherit; text-decoration: none; }
+.retex-footnote-ref a { text-decoration: none; }
+.retex-footnotes { margin-top: 1em; padding-top: 0.5em; border-top: 1px solid var(--retex-border); font-size: var(--retex-fs-small); }
+.retex-footnotes ol { margin: 0; padding-left: 1.4em; }
+
+@media print {
+    .retex-resume { max-width: none; margin: 0; padding: 0; }
+    .retex-section, .retex-entry { break-inside: avoid; }
+    a { color: inherit; }
+}
+
+.retex-paper {
+    --retex-column-gap: 0.3in;
+    --retex-figure-label: "Figure";
+    --retex-table-label: "Table";
+    counter-reset: retex-sec retex-fig retex-tab retex-eq;
+    padding: 1in;
+    line-height: 2;
+    overflow-wrap: break-word;
+}
+.retex-paper .retex-para { text-align: left; hyphens: manual; }
+.retex-paper .retex-link, .retex-paper .retex-ref-body { overflow-wrap: anywhere; }
+.retex-paper .retex-para { margin: 0 0 0.55em; orphans: 2; widows: 2; }
+.retex-paper .retex-para:last-child { margin-bottom: 0.55em; }
+
+/* The page: front matter above, then the flowing body. */
+.retex-paper-front { margin-bottom: 1.4em; }
+.retex-paper-title {
+    font-family: var(--retex-font-heading);
+    font-size: var(--retex-fs-name);
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0 0 0.45em;
+    text-wrap: balance;
+}
+.retex-paper-date { color: var(--retex-muted); margin: 0.4em 0 1em; }
+.retex-authors { display: flex; flex-wrap: wrap; gap: 0.5em 2em; margin-bottom: 0.8em; }
+.retex-author { display: flex; flex-direction: column; line-height: 1.25; }
+.retex-author-name { font-weight: 600; }
+.retex-author-detail { font-size: var(--retex-fs-small); color: var(--retex-muted); }
+.retex-author-email { font-size: var(--retex-fs-small); color: var(--retex-muted); text-decoration: none; }
+.retex-paper .retex-contact { margin-bottom: 0.8em; }
+
+.retex-paper.retex-paper--2col .retex-paper-body { column-count: 2; column-gap: var(--retex-column-gap); }
+
+/* Sections flow across columns and pages, unlike a resume's kept-together blocks. */
+.retex-paper .retex-section { break-inside: auto; margin-bottom: var(--retex-sp-section); }
+.retex-paper .retex-section-title { margin: 0 0 0.45em; line-height: 1.2; break-after: avoid; }
+.retex-paper .retex-subsection-title { margin: 0.8em 0 0.3em; line-height: 1.2; break-after: avoid; font-size: 1em; font-weight: 700; }
+.retex-paper h3.retex-subsection-title { font-size: 1.05em; }
+.retex-paper h4.retex-subsection-title { font-style: italic; }
+.retex-paper h5.retex-subsection-title { font-weight: 700; font-style: italic; }
+
+/* Abstract and keywords. */
+.retex-abstract { margin: 0 0 0.7em; }
+.retex-abstract-label { font-family: var(--retex-font-heading); font-size: 1em; font-weight: 700; margin: 0 0 0.25em; }
+.retex-keywords { margin: 0 0 1em; }
+.retex-keywords-label { font-weight: 700; margin-right: 0.35em; }
+
+/* Numbering. */
+.retex-paper[class*="--num-"] .retex-section { counter-reset: retex-sub retex-subsub; }
+.retex-paper[class*="--num-"] .retex-section h3.retex-subsection-title { counter-reset: retex-subsub; }
+.retex-paper.retex-paper--num-decimal .retex-section:not(.retex-section--unnumbered) > .retex-section-title::before {
+    counter-increment: retex-sec;
+    content: counter(retex-sec) "\2002";
+}
+.retex-paper.retex-paper--num-decimal .retex-section:not(.retex-section--unnumbered) h3.retex-subsection-title:not(.retex-subsection-title--unnumbered)::before {
+    counter-increment: retex-sub;
+    content: counter(retex-sec) "." counter(retex-sub) "\2002";
+}
+.retex-paper.retex-paper--num-decimal .retex-section:not(.retex-section--unnumbered) h4.retex-subsection-title:not(.retex-subsection-title--unnumbered)::before {
+    counter-increment: retex-subsub;
+    content: counter(retex-sec) "." counter(retex-sub) "." counter(retex-subsub) "\2002";
+}
+.retex-paper.retex-paper--num-ieee .retex-section:not(.retex-section--unnumbered) > .retex-section-title::before {
+    counter-increment: retex-sec;
+    content: counter(retex-sec, upper-roman) ".\2002";
+}
+.retex-paper.retex-paper--num-ieee .retex-section:not(.retex-section--unnumbered) h3.retex-subsection-title:not(.retex-subsection-title--unnumbered)::before {
+    counter-increment: retex-sub;
+    content: counter(retex-sub, upper-alpha) ".\2002";
+}
+.retex-paper.retex-paper--num-ieee .retex-section:not(.retex-section--unnumbered) h4.retex-subsection-title:not(.retex-subsection-title--unnumbered)::before {
+    counter-increment: retex-subsub;
+    content: counter(retex-subsub) ")\2002";
+}
+
+/* Figures, tables, equations. Keep them whole, and let wide ones span the page. */
+.retex-paper .retex-figure { margin: 0.9em 0; text-align: center; break-inside: avoid; }
+.retex-paper .retex-caption { font-size: var(--retex-fs-small); line-height: 1.25; margin-top: 0.45em; text-align: left; }
+.retex-paper .retex-figure > .retex-caption::before {
+    counter-increment: retex-fig;
+    content: var(--retex-figure-label) " " counter(retex-fig) ".\2002";
+    font-weight: 700;
+}
+.retex-paper .retex-table-wrap { margin: 0.9em 0; break-inside: avoid; }
+.retex-paper .retex-table caption { caption-side: top; margin: 0 0 0.45em; }
+.retex-paper .retex-table caption::before {
+    counter-increment: retex-tab;
+    content: var(--retex-table-label) " " counter(retex-tab) ".\2002";
+    font-weight: 700;
+}
+.retex-paper .retex-table { font-size: 0.9em; line-height: 1.25; border-top: 1.2px solid var(--retex-border); border-bottom: 1.2px solid var(--retex-border); background: none; }
+.retex-paper .retex-table caption { background: none; }
+.retex-paper .retex-table th { border-bottom: 0.7px solid var(--retex-border); background: none; }
+.retex-paper .retex-table th, .retex-paper .retex-table td { padding: 0.25em 0.5em; border-left: none; border-right: none; }
+.retex-paper .retex-table td { border-top: none; border-bottom: none; }
+.retex-figure--wide, .retex-table-wrap--wide, .retex-equation--wide { column-span: all; }
+
+.retex-paper.retex-paper--eqno .retex-equation--numbered { position: relative; padding: 0 2.4em; }
+.retex-paper.retex-paper--eqno .retex-equation--numbered::after {
+    counter-increment: retex-eq;
+    content: "(" counter(retex-eq) ")";
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.retex-paper .retex-list { margin-bottom: 0.55em; }
+
+/* Code, quotations, and notes, sized for a narrow column. */
+.retex-paper .retex-codeblock { font-size: 0.8em; line-height: 1.3; break-inside: avoid; white-space: pre-wrap; overflow-wrap: anywhere; hyphens: manual; text-align: left; }
+.retex-paper .retex-code { font-size: 0.88em; overflow-wrap: anywhere; hyphens: manual; }
+.retex-paper .retex-quote { font-size: 0.97em; }
+.retex-paper .retex-footnotes { break-inside: auto; font-size: var(--retex-fs-small); line-height: 1.25; }
+.retex-paper .retex-footnotes li > .retex-para { display: inline; margin: 0; text-indent: 0; }
+.retex-paper .retex-footnotes li > .retex-para ~ .retex-para::before { content: " "; }
+
+/* On screen, tall balanced columns mean scrolling back up to read the next one.
+   Wrap them into screen-sized rows instead, or failing that balance each section. */
+@media screen {
+    @supports (column-wrap: wrap) {
+        .retex-paper.retex-paper--2col .retex-paper-body { column-wrap: wrap; column-height: min(9.5in, 85vh); row-gap: 2.5em; }
+    }
+    @supports not (column-wrap: wrap) {
+        .retex-paper.retex-paper--2col .retex-paper-body { column-count: auto; }
+        .retex-paper.retex-paper--2col .retex-section-body { column-count: 2; column-gap: var(--retex-column-gap); }
+    }
+}
+@media print {
+    .retex-paper .retex-footnote-back { display: none; }
+    /* Past the margin beats cut off: nothing in a printed page can scroll. */
+    .retex-paper .retex-equation { overflow: visible; }
+}
+
+/* normal */
+.retex-paper--normal .retex-section-title { font-weight: 700; }
+.retex-paper--normal .retex-abstract { padding: 0.8em 1em; background: rgba(127,127,127,0.08); border-radius: 4px; }
+.retex-paper--normal .retex-keywords { font-size: var(--retex-fs-small); }
+
+/* ieee */
+.retex-paper--ieee .retex-paper-front { text-align: center; }
+.retex-paper--ieee .retex-paper-title { font-weight: 400; }
+.retex-paper--ieee .retex-authors { justify-content: center; gap: 0.6em 3em; }
+.retex-paper--ieee .retex-author-name { font-weight: 400; font-size: 1.1em; }
+.retex-paper--ieee .retex-author-detail { font-style: italic; }
+.retex-paper--ieee .retex-section-title { font-variant: small-caps; font-weight: 400; text-align: center; font-size: 1.1em; }
+.retex-paper--ieee h3.retex-subsection-title { font-style: italic; font-weight: 400; font-size: 1em; }
+.retex-paper--ieee h4.retex-subsection-title { font-style: italic; font-weight: 400; }
+.retex-paper--ieee .retex-section-body > .retex-para + .retex-para { text-indent: 1em; }
+.retex-paper--ieee .retex-abstract, .retex-paper--ieee .retex-keywords { font-size: 0.9em; font-weight: 700; line-height: 1.15; text-align: justify; }
+.retex-paper--ieee .retex-abstract-label, .retex-paper--ieee .retex-keywords-label { font-style: italic; font-weight: 700; font-family: inherit; }
+.retex-paper--ieee .retex-abstract-body, .retex-paper--ieee .retex-abstract-body > .retex-para:first-child, .retex-paper--ieee .retex-abstract-label { display: inline; }
+.retex-paper--ieee .retex-abstract-label::after, .retex-paper--ieee .retex-keywords-label::after { content: "\2014"; }
+.retex-paper--ieee .retex-keywords-label { margin-right: 0; }
+.retex-paper--ieee .retex-abstract .retex-para { margin: 0; text-align: justify; }
+.retex-paper--ieee .retex-table caption { text-align: center; font-variant: small-caps; }
+.retex-paper--ieee .retex-table caption::before { content: var(--retex-table-label) " " counter(retex-tab, upper-roman); display: block; font-weight: 400; font-variant: normal; }
+.retex-paper--ieee .retex-figure > .retex-caption { text-align: center; }
+.retex-paper--ieee .retex-references { font-size: 0.8em; line-height: 1.2; }
+
+/* acm */
+.retex-paper--acm .retex-paper-title { font-weight: 700; }
+.retex-paper--acm .retex-authors { gap: 0.6em 2.5em; }
+.retex-paper--acm .retex-author-name { font-family: var(--retex-font-heading); font-size: 1.05em; }
+.retex-paper--acm .retex-abstract-label { text-transform: uppercase; }
+.retex-paper--acm .retex-section-title { text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em; }
+.retex-paper--acm .retex-subsection-title { font-family: var(--retex-font-heading); }
+.retex-paper--acm .retex-section-body > .retex-para + .retex-para { text-indent: 1em; }
+.retex-paper--acm .retex-keywords { padding-bottom: 0.8em; border-bottom: 0.7px solid var(--retex-border); }
+.retex-paper--acm .retex-keywords-label { font-family: var(--retex-font-heading); text-transform: uppercase; display: block; margin-bottom: 0.25em; }
+.retex-paper--acm .retex-references { font-size: 0.85em; line-height: 1.2; }
+
+/* arxiv */
+.retex-paper--arxiv .retex-paper-front { text-align: center; }
+.retex-paper--arxiv .retex-paper-title { border-top: 3px solid #000; border-bottom: 1px solid #000; padding: 0.55em 0.4em; margin-bottom: 1em; }
+.retex-paper--arxiv .retex-authors { justify-content: center; gap: 0.6em 2.5em; }
+.retex-paper--arxiv .retex-abstract { margin: 1.2em 2.5em 0.6em; }
+.retex-paper--arxiv .retex-abstract-label { text-align: center; font-size: 1.1em; }
+.retex-paper--arxiv .retex-abstract .retex-para { text-align: justify; }
+.retex-paper--arxiv .retex-keywords { margin: 0 2.5em 1em; text-align: left; }
+.retex-paper--arxiv .retex-section-title { font-weight: 700; }
+.retex-paper--arxiv .retex-references { font-size: 0.95em; }
+
+/* lncs */
+.retex-paper--lncs .retex-paper-front { text-align: center; }
+.retex-paper--lncs .retex-paper-title { margin-bottom: 0.9em; }
+.retex-paper--lncs .retex-authors { justify-content: center; }
+.retex-paper--lncs .retex-author-name { font-weight: 400; }
+.retex-paper--lncs .retex-abstract, .retex-paper--lncs .retex-keywords { font-size: 0.9em; margin-left: 2.2em; margin-right: 2.2em; text-align: justify; }
+.retex-paper--lncs .retex-abstract-body, .retex-paper--lncs .retex-abstract-body > .retex-para:first-child, .retex-paper--lncs .retex-abstract-label { display: inline; }
+.retex-paper--lncs .retex-abstract-label { font-weight: 700; margin-right: 0.4em; }
+.retex-paper--lncs .retex-abstract .retex-para { margin: 0; text-align: justify; }
+.retex-paper--lncs h3.retex-subsection-title { font-size: 1em; }
+.retex-paper--lncs .retex-section-body > .retex-para + .retex-para { text-indent: 1.2em; }
+.retex-paper--lncs .retex-references { font-size: 0.9em; }
+
+/* apa */
+.retex-paper--apa .retex-paper-front { text-align: center; }
+.retex-paper--apa .retex-paper-title { line-height: 1.5; margin-bottom: 1em; }
+.retex-paper--apa .retex-authors { justify-content: center; flex-direction: column; align-items: center; gap: 0; }
+.retex-paper--apa .retex-author { line-height: 2; }
+.retex-paper--apa .retex-author-name { font-weight: 400; }
+.retex-paper--apa .retex-author-detail, .retex-paper--apa .retex-author-email { font-size: 1em; color: inherit; }
+.retex-paper--apa .retex-abstract { text-align: left; margin-top: 1.5em; }
+.retex-paper--apa .retex-abstract-label, .retex-paper--apa .retex-section-title { text-align: center; }
+.retex-paper--apa .retex-keywords { text-align: left; text-indent: 0.5in; }
+.retex-paper--apa .retex-keywords-label { font-style: italic; font-weight: 400; }
+.retex-paper--apa .retex-para { margin: 0; }
+.retex-paper--apa .retex-para:last-child { margin: 0; }
+.retex-paper--apa .retex-section-body > .retex-para, .retex-paper--apa .retex-paper-body > .retex-para { text-indent: 0.5in; }
+.retex-paper--apa h3.retex-subsection-title { text-align: left; font-size: 1em; margin: 0; }
+.retex-paper--apa h4.retex-subsection-title { text-align: left; font-style: italic; font-weight: 700; margin: 0; }
+.retex-paper--apa .retex-section { margin-bottom: 0; }
+.retex-paper--apa .retex-section-title { margin: 0; }
+.retex-paper--apa .retex-table caption::before { display: block; }
+.retex-paper--apa .retex-table caption { font-style: italic; }
+.retex-paper--apa .retex-table caption::before { font-style: normal; }
+.retex-paper--apa .retex-references { line-height: 2; }
+.retex-paper--apa .retex-ref-label { display: none; }
+.retex-paper--apa .retex-references li { display: block; padding-left: 0.5in; text-indent: -0.5in; }
+.retex-paper--apa .retex-footnotes { line-height: 1.5; }
+
+/* journal */
+.retex-paper--journal .retex-paper-title { color: var(--retex-primary); font-weight: 700; }
+.retex-paper--journal .retex-author-name { font-family: var(--retex-font-heading); }
+.retex-paper--journal .retex-abstract { background: rgba(11,83,148,0.06); border-left: 3px solid var(--retex-primary); padding: 0.8em 1em; margin-bottom: 0; }
+.retex-paper--journal .retex-abstract-label { color: var(--retex-primary); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.95em; }
+.retex-paper--journal .retex-keywords { background: rgba(11,83,148,0.06); border-left: 3px solid var(--retex-primary); padding: 0 1em 0.8em; font-size: 0.95em; }
+.retex-paper--journal .retex-keywords-label { color: var(--retex-primary); font-family: var(--retex-font-heading); }
+.retex-paper--journal .retex-section-title { color: var(--retex-primary); border-bottom: 0.7px solid var(--retex-border); padding-bottom: 0.2em; }
+.retex-paper--journal .retex-subsection-title { font-family: var(--retex-font-heading); }
+.retex-paper--journal .retex-references { font-size: 0.9em; }
+@page {
+    size: Letter;
+    margin: 1in;
+    @top-right { content: counter(page); font-family: "Times New Roman", Times, "Liberation Serif", "Nimbus Roman", serif; font-size: 9pt; }
+}
+html, body { margin: 0; padding: 0; background: #fff; }
+@media print {
+    .retex-paper { padding: 0; background: none; }
+}
+@media screen {
+    body { background: #e7e9ec; padding: 24px; }
+    .retex-paper { box-shadow: 0 1px 8px rgba(0,0,0,.16); }
+}
+</style>
+</head>
+<body>
+<article class="retex-resume retex-paper retex-paper--apa">
+<header class="retex-paper-front"><h1 class="retex-paper-title">Sparse Attention for Efficient Long-Context Language Models</h1><div class="retex-authors"><div class="retex-author"><span class="retex-author-name">Ada Lovelace</span><span class="retex-author-detail">Analytical Engine Lab</span></div><div class="retex-author"><span class="retex-author-name">Alan Turing</span><span class="retex-author-detail">Bletchley Institute</span></div></div><p class="retex-paper-date">March 2026</p><section class="retex-abstract"><h2 class="retex-abstract-label">Abstract</h2><div class="retex-abstract-body"><p class="retex-para">Long-context language models spend most of their compute on attention scores that barely influence the output. We present <strong>SparseFormer</strong>, an attention mechanism that keeps only the top-<span class="retex-math"><math display="inline"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math></span> scores per query, reducing the cost of a forward pass from <span class="retex-math"><math display="inline"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(n^2)</annotation></semantics></math></span> to <span class="retex-math"><math display="inline"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>n</mi><mi>k</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(nk)</annotation></semantics></math></span> with no measurable loss in accuracy on standard benchmarks<sup class="retex-footnote-ref"><a id="retex-fnref-1" href="#retex-fn-1">1</a></sup>.</p></div></section>
+<p class="retex-keywords"><span class="retex-keywords-label">Keywords:</span><span class="retex-keywords-list">attention mechanisms, sparsity, language models, efficient inference</span></p></header>
+<div class="retex-paper-body">
+<section class="retex-section"><h2 class="retex-section-title">1. Introduction</h2><div class="retex-section-body"><p class="retex-para">Transformers <span class="retex-cite">[<a href="#retex-ref-1">1</a>]</span> have become the default architecture for language modelling, yet their cost grows quadratically with context length. Several approaches trade accuracy for speed <span class="retex-cite">[<a href="#retex-ref-2">2</a>, <a href="#retex-ref-3">3</a>]</span>, and most of them need retraining from scratch.</p>
+<p class="retex-para">Our contributions are:</p>
+<ol class="retex-list"><li>A <em>top-k</em> attention rule that is a drop-in replacement for scaled dot-product attention.</li><li>A proof that the approximation error is bounded by the discarded attention mass.<ul class="retex-list"><li>The bound is tight for uniform attention.</li><li>It is loose, in a useful way, for peaked attention.</li></ul></li><li>An open-source implementation at <a class="retex-link" href="https://example.org/sparseformer" target="_blank" rel="noopener noreferrer">https://example.org/sparseformer</a>.</li></ol>
+<blockquote class="retex-quote"><p class="retex-para">Most attention mass concentrates on a tiny fraction of tokens, so most of the computation is spent on rounding errors.</p></blockquote></div></section>
+<section class="retex-section"><h2 class="retex-section-title">2. Background</h2><div class="retex-section-body"><h3 class="retex-subsection-title">2.1 Scaled dot-product attention</h3>
+<p class="retex-para">Given queries <span class="retex-math"><math display="inline"><semantics><mi>Q</mi><annotation encoding="application/x-tex">Q</annotation></semantics></math></span>, keys <span class="retex-math"><math display="inline"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math></span>, and values <span class="retex-math"><math display="inline"><semantics><mi>V</mi><annotation encoding="application/x-tex">V</annotation></semantics></math></span>, standard attention computes</p>
+<div class="retex-equation retex-equation--numbered"><math display="block"><semantics><mrow><mrow><mi mathvariant="normal">A</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">n</mi></mrow><mo stretchy="false">(</mo><mi>Q</mi><mo separator="true">,</mo><mi>K</mi><mo separator="true">,</mo><mi>V</mi><mo stretchy="false">)</mo><mo>=</mo><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">f</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">m</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">x</mi></mrow><mrow><mo stretchy="true" fence="true">(</mo><mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mi>⊤</mi></msup></mrow><mrow><msqrt><mrow><msub><mi>d</mi><mi>k</mi></msub></mrow></msqrt></mrow></mfrac><mo stretchy="true" fence="true">)</mo></mrow><mi>V</mi></mrow><annotation encoding="application/x-tex">\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\left(\frac{Q K^\top}{\sqrt{d_k}}\right) V</annotation></semantics></math></div>
+<p class="retex-para">where <span class="retex-math"><math display="inline"><semantics><msub><mi>d</mi><mi>k</mi></msub><annotation encoding="application/x-tex">d_k</annotation></semantics></math></span> is the key dimension. For a sequence of length <span class="retex-math"><math display="inline"><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math></span>, this requires <span class="retex-math"><math display="inline"><semantics><msup><mi>n</mi><mn>2</mn></msup><annotation encoding="application/x-tex">n^2</annotation></semantics></math></span> score computations. A price tag of $5 or $10 per million tokens makes this matter in practice.</p>
+<h3 class="retex-subsection-title">2.2 Why sparsity is plausible</h3>
+<p class="retex-para">Empirically, the entropy of attention distributions is low. If <span class="retex-math"><math display="inline"><semantics><mrow><mi>H</mi><mo stretchy="false">(</mo><mi>p</mi><mo stretchy="false">)</mo><mo>=</mo><mo lspace="0" rspace="0">−</mo><msubsup><mo largeop="true" movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>n</mi></mrow></msubsup><msub><mi>p</mi><mi>i</mi></msub><mrow><mspace width="0.167em"></mspace><mi>log</mi></mrow><mo lspace="0" rspace="0.167em">&#x2061;</mo><msub><mi>p</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">H(p) = -\sum_{i=1}^{n} p_i \log p_i</annotation></semantics></math></span> is much smaller than <span class="retex-math"><math display="inline"><semantics><mrow><mi>log</mi><mo lspace="0" rspace="0.167em">&#x2061;</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">\log n</annotation></semantics></math></span>, a few entries dominate.</p></div></section>
+<section class="retex-section"><h2 class="retex-section-title">3. Method</h2><div class="retex-section-body"><p class="retex-para">We keep the <span class="retex-math"><math display="inline"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math></span> largest scores for each query and renormalize:</p>
+<div class="retex-equation retex-equation--numbered"><math display="block"><semantics><mrow><msub><mover accent="true"><mrow><mi>a</mi></mrow><mo stretchy="false">~</mo></mover><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mrow><mo stretchy="true" fence="true">{</mo><mtable displaystyle="true"><mtr><mtd style="text-align:left;padding:0.25em 1em 0.25em 0"><mfrac displaystyle="true"><mrow><msub><mi>a</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><mrow><munder><mo largeop="true" movablelimits="false">∑</mo><mrow><mi>l</mi><mo>∈</mo><msub><mrow><mi>𝒯</mi></mrow><mi>i</mi></msub></mrow></munder><msub><mi>a</mi><mrow><mi>i</mi><mi>l</mi></mrow></msub></mrow></mfrac></mtd><mtd style="text-align:left;padding:0.25em 1em 0.25em 0"><mtext>if </mtext><mi>j</mi><mo>∈</mo><msub><mrow><mi>𝒯</mi></mrow><mi>i</mi></msub></mtd></mtr><mtr><mtd style="text-align:left;padding:0.25em 1em 0.25em 0"><mn>0</mn></mtd><mtd style="text-align:left;padding:0.25em 1em 0.25em 0"><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">\tilde{a}_{ij} = \begin{cases}
+  \dfrac{a_{ij}}{\sum_{l \in \mathcal{T}_i} a_{il}} &amp; \text{if } j \in \mathcal{T}_i \\
+  0 &amp; \text{otherwise}
+\end{cases}</annotation></semantics></math></div>
+<figure class="retex-figure"><img class="retex-image" src="../sparse-attention.png" alt="Scores are reduced to the top k per query before normalization."><figcaption class="retex-caption">Scores are reduced to the top k per query before normalization.</figcaption></figure>
+<p class="retex-para">The selection itself uses a partial sort, shown below. Note that <code class="retex-code">snake_case_names</code> and <code class="retex-code">a * b * c</code> are left alone.</p>
+<pre class="retex-codeblock"><code class="language-python">def sparse_attention(scores, k):
+    top, index = torch.topk(scores, k, dim=-1)
+    weights = torch.softmax(top, dim=-1)
+    return weights, index</code></pre>
+<div class="retex-table-wrap"><table class="retex-table"><caption>Results on the LongBench suite.</caption><thead><tr><th>Model</th><th style="text-align:right">Accuracy</th><th style="text-align:right">Latency (ms)</th><th style="text-align:center">Memory</th></tr></thead><tbody><tr><td>Baseline</td><td style="text-align:right">0.921</td><td style="text-align:right">412</td><td style="text-align:center">8.2 GB</td></tr><tr><td>Pruned <span class="retex-cite">[<a href="#retex-ref-2">2</a>]</span></td><td style="text-align:right">0.904</td><td style="text-align:right">231</td><td style="text-align:center">5.1 GB</td></tr><tr><td><strong>SparseFormer</strong></td><td style="text-align:right"><strong>0.919</strong></td><td style="text-align:right"><strong>98</strong></td><td style="text-align:center">2.4 GB</td></tr></tbody></table></div></div></section>
+<section class="retex-section"><h2 class="retex-section-title">4. Discussion</h2><div class="retex-section-body"><p class="retex-para">Three limitations remain:</p>
+<ul class="retex-list"><li>Very short sequences gain little, since <span class="retex-math"><math display="inline"><semantics><mrow><mi>k</mi><mo>≈</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">k \approx n</annotation></semantics></math></span>.</li><li>The selection step is hard to parallelize on some accelerators.</li><li>Tasks with <a class="retex-link" href="https://example.org/uniform" target="_blank" rel="noopener noreferrer">truly uniform attention</a> see no benefit.</li></ul>
+<p class="retex-para">The theoretical bound is</p>
+<div class="retex-equation retex-equation--numbered"><math display="block"><semantics><mrow><mo stretchy="false">‖</mo><mover accent="true"><mrow><mi>a</mi></mrow><mo stretchy="false">~</mo></mover><mo>−</mo><mi>a</mi><msub><mo stretchy="false">‖</mo><mn>1</mn></msub><mo>≤</mo><mn>2</mn><munder><mo largeop="true" movablelimits="false">∑</mo><mrow><mi>j</mi><mo>∉</mo><mrow><mi>𝒯</mi></mrow></mrow></munder><msub><mi>a</mi><mi>j</mi></msub></mrow><annotation encoding="application/x-tex">\| \tilde{a} - a \|_1 \le 2 \sum_{j \notin \mathcal{T}} a_j</annotation></semantics></math></div>
+<p class="retex-para">which also explains why the error is smallest when the attention is peaked.</p></div></section>
+<section class="retex-section"><h2 class="retex-section-title">5. Conclusion</h2><div class="retex-section-body"><p class="retex-para">SparseFormer shows that most attention computation can be skipped safely. Future work will explore learned values of <span class="retex-math"><math display="inline"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math></span>.</p></div></section>
+<section class="retex-section retex-section--unnumbered"><h2 class="retex-section-title">Acknowledgments</h2><div class="retex-section-body"><p class="retex-para">We thank the LongBench maintainers for early access.</p></div></section>
+<section class="retex-section retex-section--unnumbered"><h2 class="retex-section-title">References</h2><div class="retex-section-body"><ol class="retex-references"><li id="retex-ref-1"><span class="retex-ref-label">[1]</span><span class="retex-ref-body">A. Vaswani et al., &quot;Attention is all you need,&quot; in <em>Advances in Neural Information Processing Systems</em>, 2017.</span></li><li id="retex-ref-2"><span class="retex-ref-label">[2]</span><span class="retex-ref-body">H. Zhou et al., &quot;Informer: Beyond efficient transformer for long sequence time-series forecasting,&quot; in <em>Proc. AAAI</em>, 2021.</span></li><li id="retex-ref-3"><span class="retex-ref-label">[3]</span><span class="retex-ref-body">N. Kitaev, L. Kaiser, and A. Levskaya, &quot;Reformer: The efficient transformer,&quot; in <em>Proc. ICLR</em>, 2020.</span></li></ol></div></section>
+<section class="retex-footnotes"><ol><li id="retex-fn-1"><p class="retex-para">Benchmarks were run on the 2025 release of LongBench, with a fixed seed.</p> <a class="retex-footnote-back" href="#retex-fnref-1" aria-label="Back to text">↩︎</a></li></ol></section>
+</div>
+</article>
+</body>
+</html>

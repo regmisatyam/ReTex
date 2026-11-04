@@ -2,6 +2,7 @@ export {
   escapeHtml,
   escapeAttribute,
   sanitizeUrl,
+  sanitizeImageUrl,
   isSafeColor,
   isSafeDimension,
   sanitizeStyleValue,

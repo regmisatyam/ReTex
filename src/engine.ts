@@ -22,8 +22,15 @@ import {
   getBuiltinLibrary,
   usedLibraryNamesFromTokens,
   usedLibraryNamesFromAst,
+  usedDocumentOptions,
   type ReTeXLibrary,
 } from "./library/index.js";
+import { applyPaperOptions } from "./theme/papers.js";
+import {
+  parseMarkdown,
+  type MarkdownOptions,
+  type MarkdownResult,
+} from "./markdown/index.js";
 import {
   HtmlRenderer,
   renderJson,
@@ -246,6 +253,23 @@ export class ReTeXEngine implements PluginHost {
     return validate(input, { theme: this.bundle(input).theme });
   }
 
+  /**
+   * Convert Markdown to a ReTeX document in a paper style. The resulting AST goes
+   * to any renderer on this engine, and custom styles registered with
+   * {@link provideLibrary} can be chosen by name.
+   *
+   * ```ts
+   * const { ast, diagnostics } = engine.fromMarkdown(answer, { style: "ieee" });
+   * const html = engine.toHtmlDocument(ast);
+   * ```
+   */
+  fromMarkdown(markdown: string, options: MarkdownOptions = {}): MarkdownResult {
+    return parseMarkdown(markdown, {
+      lookupStyle: (name) => this.lookupLibrary(name)?.theme,
+      ...options,
+    });
+  }
+
   /* ----------------------------- renderers ---------------------------- */
 
   toHtml(input: string | DocumentNode, options: HtmlRenderOptions = {}): string {
@@ -353,7 +377,10 @@ export class ReTeXEngine implements PluginHost {
     const { html, react } = collectLibraryOverrides(libraries);
     return {
       ast,
-      theme: mergeLibraryTheme(this.theme, libraries),
+      theme: applyPaperOptions(
+        mergeLibraryTheme(this.theme, libraries),
+        usedDocumentOptions(ast),
+      ),
       htmlOverrides: new Map([...this.htmlOverrides, ...html]),
       reactOverrides: new Map([...this.reactOverrides, ...react]),
     };

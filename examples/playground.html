@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ReTeX — two-way preview playground</title>
+    <title>ReTeX playground</title>
     <style>
       :root {
         --bg: #0f172a;
@@ -43,6 +43,17 @@
       header.bar .hint { color: var(--muted); font-size: 12.5px; }
       header.bar .spacer { flex: 1; }
       header.bar label { color: var(--muted); font-size: 12.5px; }
+      header.bar .group { display: inline-flex; align-items: center; gap: 10px; }
+      header.bar .group[hidden] { display: none; }
+      header.bar button {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font: inherit;
+        cursor: pointer;
+      }
       header.bar select {
         background: var(--panel-2);
         color: var(--fg);
@@ -131,16 +142,34 @@
   </head>
   <body>
     <header class="bar">
-      <h1>Re<span>TeX</span> · two-way preview</h1>
-      <span class="hint">Click the preview → jumps in code · Move the caret → highlights the preview</span>
+      <h1>Re<span>TeX</span> · playground</h1>
+      <span class="hint" id="hint">Click the preview → jumps in code · Move the caret → highlights the preview</span>
       <span class="spacer"></span>
-      <label for="theme">Theme</label>
-      <select id="theme">
-        <option value="blank">blank (default)</option>
-        <option value="modern" selected>modern</option>
-        <option value="classic">classic</option>
-        <option value="compact">compact</option>
+      <label for="mode">Input</label>
+      <select id="mode">
+        <option value="retex">ReTeX</option>
+        <option value="markdown">Markdown</option>
       </select>
+      <span class="group" id="theme-controls">
+        <label for="theme">Theme</label>
+        <select id="theme">
+          <option value="blank">blank (default)</option>
+          <option value="modern" selected>modern</option>
+          <option value="classic">classic</option>
+          <option value="compact">compact</option>
+        </select>
+      </span>
+      <span class="group" id="paper-controls" hidden>
+        <label for="style">Style</label>
+        <select id="style"></select>
+        <label for="columns">Columns</label>
+        <select id="columns">
+          <option value="">Style default</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+        <button id="print" type="button">Open printable page</button>
+      </span>
     </header>
 
     <main>
@@ -175,6 +204,7 @@
       const {
         ReTeXEngine,
         getTheme,
+        paperStyleNames,
         closestSourcePos,
         pickElementForOffset,
         readSourceType,
@@ -187,6 +217,14 @@
       const themeSel = document.getElementById("theme");
       const codeTag = document.getElementById("code-tag");
       const previewTag = document.getElementById("preview-tag");
+      const modeSel = document.getElementById("mode");
+      const styleSel = document.getElementById("style");
+      const columnsSel = document.getElementById("columns");
+      const hintEl = document.getElementById("hint");
+      const RETEX_HINT = hintEl.textContent;
+
+      for (const name of paperStyleNames()) styleSel.add(new Option(name, name));
+      styleSel.value = "ieee";
 
       const SAMPLE = String.raw`\name{Grace Hopper}
 \title{Distinguished Engineer \& Compiler Pioneer}
@@ -217,7 +255,23 @@ tools. Coined the term \emph{debugging}. Reduced batch latency by 60%.
 \section{Skills}
 \skills{Compilers, COBOL, Systems Programming, Mentorship}`;
 
+      // Markdown mode opens the sample answer that ships next to this page.
+      const MARKDOWN_SAMPLE = await fetch("ai-response.md")
+        .then((r) => (r.ok ? r.text() : Promise.reject()))
+        .catch(() => "# A title\n\n## A section\n\nSome text with $x^2$ in it.");
+
       let engine = new ReTeXEngine({ theme: getTheme(themeSel.value) });
+      const paperEngine = new ReTeXEngine();
+      const drafts = { retex: SAMPLE, markdown: MARKDOWN_SAMPLE };
+      let mode = "retex";
+
+      function markdownAst() {
+        const columns = Number(columnsSel.value);
+        return paperEngine.fromMarkdown(codeEl.value, {
+          style: styleSel.value,
+          ...(columns ? { columns } : {}),
+        }).ast;
+      }
 
       /* ----------------------------- render ----------------------------- */
 
@@ -228,7 +282,14 @@ tools. Coined the term \emph{debugging}. Reduced batch latency by 60%.
       }
 
       function render() {
-        styleEl.textContent = engine.styles();
+        if (mode === "markdown") {
+          const ast = markdownAst();
+          styleEl.textContent = paperEngine.styles(ast);
+          previewEl.innerHTML = paperEngine.toHtml(ast);
+          activeEl = null;
+          return;
+        }
+        styleEl.textContent = engine.styles(codeEl.value);
         // `sourceMap: true` stamps every element with data-rtx-pos="start:end".
         previewEl.innerHTML = engine.toHtml(codeEl.value, { sourceMap: true });
         activeEl = null;
@@ -324,6 +385,30 @@ tools. Coined the term \emph{debugging}. Reduced batch latency by 60%.
       codeEl.addEventListener("click", onCaret);
       document.addEventListener("selectionchange", () => {
         if (document.activeElement === codeEl) onCaret();
+      });
+
+      modeSel.addEventListener("change", () => {
+        drafts[mode] = codeEl.value;
+        mode = modeSel.value;
+        codeEl.value = drafts[mode];
+        const markdown = mode === "markdown";
+        document.getElementById("paper-controls").hidden = !markdown;
+        document.getElementById("theme-controls").hidden = markdown;
+        hintEl.textContent = markdown
+          ? "Paste an AI answer or any Markdown, then pick a paper style"
+          : RETEX_HINT;
+        previewTag.textContent = "";
+        render();
+      });
+      styleSel.addEventListener("change", render);
+      columnsSel.addEventListener("change", render);
+
+      document.getElementById("print").addEventListener("click", () => {
+        // A base URL lets the page, opened from a blob, still find relative images.
+        const html = paperEngine
+          .toHtmlDocument(markdownAst())
+          .replace("<head>", `<head><base href="${location.href}">`);
+        window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })));
       });
 
       themeSel.addEventListener("change", () => {

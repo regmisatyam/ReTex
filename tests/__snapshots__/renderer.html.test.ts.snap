@@ -11,6 +11,6 @@ exports[`html renderer — snapshots > matches the resume snapshot 1`] = `
 
 exports[`html renderer — snapshots > matches the typography snapshot 1`] = `
 "<div class="retex-resume">
-<p class="retex-para"><strong>a</strong><em>b</em><u>c</u><span class="retex-scale-Large"> big</span><span style="color:#fff">w</span></p>
+<p class="retex-para"><strong>a</strong> <em>b</em> <u>c</u> <span class="retex-scale-Large"> big</span> <span style="color:#fff">w</span></p>
 </div>"
 `;

@@ -2,6 +2,8 @@ import type { DocumentNode, Theme } from "../types/index.js";
 import { resolveTheme } from "../theme/themes.js";
 import { isSafeDimension, sanitizeStyleValue } from "../security/sanitize.js";
 import { HtmlRenderer, type HtmlRenderOptions } from "./html.js";
+import { paperPageCss, safeMargin } from "./paper-css.js";
+import { documentTitle } from "./structure.js";
 
 /** Vet a page size keyword/dimension before it reaches CSS or the PDF API. */
 const pageSize = (v: string | undefined): string =>
@@ -19,6 +21,7 @@ export interface PrintOptions extends HtmlRenderOptions {
  * web page into a paginated, print-ready document.
  */
 export function pageCss(theme: Theme): string {
+  if (theme.paper) return paperPageCss(theme);
   const size = pageSize(theme.page?.size);
   const margin = pageMargin(theme.page?.margin);
   return `@page { size: ${size}; margin: ${margin}; }
@@ -37,7 +40,7 @@ export function renderPrintHtml(ast: DocumentNode, options: PrintOptions = {}): 
   const theme = options.theme ?? resolveTheme();
   const renderer = new HtmlRenderer({ ...options, theme });
   const body = renderer.render(ast);
-  const title = options.title ?? "Resume";
+  const title = options.title ?? documentTitle(ast, "Resume");
   return [
     "<!DOCTYPE html>",
     '<html lang="en">',
@@ -96,16 +99,31 @@ export async function renderPdf(
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
     const size = pageSize(theme.page?.size);
-    const margin = pageMargin(theme.page?.margin);
+    const margin = theme.paper
+      ? marginSides(safeMargin(theme.page?.margin, "1in"))
+      : marginSides(pageMargin(theme.page?.margin));
     return await page.pdf({
       printBackground: options.printBackground ?? true,
       preferCSSPageSize: true,
       format: size,
-      margin: { top: margin, bottom: margin, left: margin, right: margin },
+      margin,
+      // Paper styles number their own pages through `@page` rules.
+      ...(theme.paper ? { displayHeaderFooter: false } : {}),
     });
   } finally {
     await browser.close();
   }
+}
+
+/** Expand a CSS margin shorthand into the four sides the PDF API expects. */
+function marginSides(margin: string): Record<"top" | "right" | "bottom" | "left", string> {
+  const [top, right = top, bottom = top, left = right] = margin.split(/\s+/) as [
+    string,
+    string?,
+    string?,
+    string?,
+  ];
+  return { top, right, bottom, left };
 }
 
 async function defaultLauncher(): Promise<() => Promise<HeadlessBrowser>> {
