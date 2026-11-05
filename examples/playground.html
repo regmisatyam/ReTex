@@ -1,233 +1,297 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ReTeX playground</title>
-    <style>
-      :root {
-        --bg: #0f172a;
-        --panel: #111827;
-        --panel-2: #0b1220;
-        --line: #1f2937;
-        --fg: #e5e7eb;
-        --muted: #94a3b8;
-        --accent: #7c3aed;
-        --accent-soft: rgba(124, 58, 237, 0.18);
-        --accent-line: rgba(124, 58, 237, 0.55);
-      }
-      * { box-sizing: border-box; }
-      html, body { height: 100%; margin: 0; }
-      body {
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-        background: var(--bg);
-        color: var(--fg);
-        display: flex;
-        flex-direction: column;
-      }
-      header.bar {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 10px 16px;
-        background: var(--panel);
-        border-bottom: 1px solid var(--line);
-      }
-      header.bar h1 {
-        font-size: 14px;
-        margin: 0;
-        font-weight: 700;
-        letter-spacing: 0.2px;
-      }
-      header.bar h1 span { color: var(--accent); }
-      header.bar .hint { color: var(--muted); font-size: 12.5px; }
-      header.bar .spacer { flex: 1; }
-      header.bar label { color: var(--muted); font-size: 12.5px; }
-      header.bar .group { display: inline-flex; align-items: center; gap: 10px; }
-      header.bar .group[hidden] { display: none; }
-      header.bar button {
-        background: var(--accent);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        padding: 5px 10px;
-        font: inherit;
-        cursor: pointer;
-      }
-      header.bar select {
-        background: var(--panel-2);
-        color: var(--fg);
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 4px 8px;
-        font: inherit;
-      }
-      main {
-        flex: 1;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        min-height: 0;
-      }
-      .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-      .pane + .pane { border-left: 1px solid var(--line); }
-      .pane .pane-head {
-        padding: 7px 14px;
-        font-size: 11.5px;
-        text-transform: uppercase;
-        letter-spacing: 0.7px;
-        color: var(--muted);
-        background: var(--panel-2);
-        border-bottom: 1px solid var(--line);
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      .pane .pane-head .tag {
-        margin-left: auto;
-        color: var(--accent);
-        text-transform: none;
-        letter-spacing: 0;
-        font-variant-numeric: tabular-nums;
-        min-height: 1em;
-      }
-      /* Code editor */
-      #code {
-        flex: 1;
-        resize: none;
-        border: 0;
-        outline: none;
-        padding: 16px;
-        background: var(--panel);
-        color: #d1d5db;
-        font: 13.5px/1.7 ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-        tab-size: 2;
-        white-space: pre;
-        overflow: auto;
-      }
-      #code::selection { background: var(--accent-soft); }
-      #code.flash { animation: codeflash 0.5s ease; }
-      @keyframes codeflash {
-        from { background: #1a1033; }
-        to { background: var(--panel); }
-      }
-      /* Preview */
-      #preview-scroll { flex: 1; overflow: auto; background: #e2e8f0; padding: 28px; }
-      #preview {
-        background: #fff;
-        color: #111;
-        max-width: 820px;
-        margin: 0 auto;
-        padding: 40px 44px;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-      }
-      /* Two-way sync affordances on the rendered resume */
-      #preview [data-rtx-pos] { cursor: pointer; border-radius: 3px; transition: background 0.12s ease, box-shadow 0.12s ease; }
-      #preview [data-rtx-pos]:hover { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft); }
-      #preview .rtx-sync-active {
-        background: var(--accent-soft) !important;
-        box-shadow: 0 0 0 2px var(--accent-line) !important;
-      }
-      .err {
-        margin: auto;
-        max-width: 520px;
-        background: #1f1330;
-        border: 1px solid var(--accent-line);
-        color: var(--fg);
-        border-radius: 10px;
-        padding: 20px 22px;
-      }
-      .err code { color: #c4b5fd; }
-    </style>
-  </head>
-  <body>
-    <header class="bar">
-      <h1>Re<span>TeX</span> · playground</h1>
-      <span class="hint" id="hint">Click the preview → jumps in code · Move the caret → highlights the preview</span>
-      <span class="spacer"></span>
-      <label for="mode">Input</label>
-      <select id="mode">
-        <option value="retex">ReTeX</option>
-        <option value="markdown">Markdown</option>
-      </select>
-      <span class="group" id="theme-controls">
-        <label for="theme">Theme</label>
-        <select id="theme">
-          <option value="blank">blank (default)</option>
-          <option value="modern" selected>modern</option>
-          <option value="classic">classic</option>
-          <option value="compact">compact</option>
-        </select>
-      </span>
-      <span class="group" id="paper-controls" hidden>
-        <label for="style">Style</label>
-        <select id="style"></select>
-        <label for="columns">Columns</label>
-        <select id="columns">
-          <option value="">Style default</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>
-        <button id="print" type="button">Open printable page</button>
-      </span>
-    </header>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2a2f3a">
+<title>ReTeX Playground</title>
+<style>
+:root {
+  color-scheme: light;
+  font: 14px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1c2230;
+  --bar: #2a2f3a;
+  --editor: #1b2030;
+  --desk: #e4e7ef;
+  --paper: #fff;
+  --mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  --accent: #6d5bd0;
+  --editor-w: 1fr;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bar); }
+button, select { font: inherit; color: inherit; cursor: pointer; }
+:where(button, select):focus-visible { outline: 2px solid #c4b6ff; outline-offset: 2px; }
+[hidden] { display: none !important; }
+.app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+.topbar, .statusbar { display: flex; align-items: center; background: var(--bar); color: #e6e8f0; }
+.topbar { gap: 10px; min-height: 48px; padding: 6px 12px; flex-wrap: wrap; }
+.brand, .mode, .tools, .settings, .setting { display: flex; align-items: center; }
+.brand { gap: 9px; margin-right: 4px; }
+.mark { width: 26px; height: 26px; flex: none; }
+.brand h1 { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 600 17px/1 Georgia, "Iowan Old Style", serif; letter-spacing: -.4px; }
+.brand small { font: 550 11px/1 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #9aa3b8; }
+.mode { padding: 2px; border-radius: 8px; background: #00000038; }
+.mode button, .tools button { border: 0; background: transparent; }
+.mode button { border-radius: 6px; padding: 5px 11px; color: #c5cad6; font-size: 12px; font-weight: 650; }
+.mode .is-on { background: #fff; color: #242833; }
+.sep { width: 1px; height: 20px; background: #ffffff24; flex: none; }
+.tools { gap: 1px; }
+.tools button { width: 30px; height: 30px; border-radius: 6px; color: #d5d9e6; font-size: 13px; font-weight: 700; }
+.tools button:hover, .mode button:hover { background: #ffffff16; }
+.mode .is-on:hover { background: #fff; }
+.tools svg { width: 16px; height: 16px; display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.settings { gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.setting { gap: 6px; font-size: 11px; font-weight: 600; color: #aeb6c9; }
+select, .print { height: 30px; border: 1px solid #ffffff24; border-radius: 7px; background: #ffffff12; color: #f2f4fa; padding: 0 8px; font-size: 12px; color-scheme: dark; }
+select:hover, .print:hover { background: #ffffff1e; }
+.print { background: var(--accent); border-color: transparent; font-weight: 650; padding-inline: 12px; }
+.print:hover { background: #7d6ad8; }
+.grow { flex: 1; min-width: 8px; }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, var(--editor-w)) 6px minmax(280px, 1fr); }
+.pane { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+#splitter { cursor: col-resize; background: var(--bar); touch-action: none; }
+#splitter:hover, #splitter:focus-visible { background: #3a4154; }
+.source-pane { background: var(--editor); color: #d7dce8; }
+#editor { position: relative; flex: 1; min-height: 0; --row: 22px; --pad: 18px; --gutter: 54px; }
+.scroll-cap { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; background: #1b2030; z-index: 4; pointer-events: none; }
+#code, #highlight, #gutter { font: 13.5px/var(--row) var(--mono); letter-spacing: 0; tab-size: 2; white-space: pre; margin: 0; }
+#code, #highlight { position: absolute; inset: 0 0 0 var(--gutter); width: calc(100% - var(--gutter)); height: 100%; border: 0; padding: var(--pad) 22px 56px 10px; overflow: auto; }
+#gutter { position: absolute; inset: 0 auto 0 0; width: calc(var(--gutter) - 10px); padding: var(--pad) 8px 56px 0; text-align: right; color: #667089; overflow: hidden; pointer-events: none; user-select: none; }
+#highlight { color: #d5dbe8; pointer-events: none; }
+#highlight::-webkit-scrollbar { visibility: hidden; }
+#code { resize: none; color: transparent; caret-color: #fff; background: transparent; outline: none; color-scheme: dark; -webkit-text-fill-color: transparent; }
+#code::selection { background: #8b78e055; }
+.syn { color: #c4b5fd; }
+.md-strong { color: #f3c7a0; }
+#editor.flash { box-shadow: inset 0 0 0 2px #c4b5fd88; }
+.preview-pane { background: var(--desk); }
+#preview-scroll { flex: 1; min-height: 0; overflow: auto; padding: 28px 20px 40px; scrollbar-gutter: stable; }
+#sheet { position: relative; margin: 0 auto; }
+#preview { position: absolute; top: 0; left: 0; width: 8.5in; transform-origin: top left; padding: 0; background: var(--paper); color: #1c2230; border-radius: 1px; box-shadow: 0 1px 2px #1c223014, 0 12px 32px #1c223024; overflow-wrap: break-word; }
+#preview :is(.retex-resume, .local-paper) { margin: 0; box-shadow: none; }
+#preview [data-rtx-pos] { cursor: pointer; border-radius: 2px; }
+#preview [data-rtx-pos]:hover, #preview .rtx-sync-active { background-color: #6d5bd01c; }
+.statusbar { height: 28px; justify-content: space-between; padding: 0 14px; font: 12px/1 var(--mono); color: #b7becd; flex: none; }
+#code::-webkit-scrollbar, #preview-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+#code::-webkit-scrollbar-track, #code::-webkit-scrollbar-corner { background: #1b2030; }
+#code::-webkit-scrollbar-thumb { background: #4d5568; border-radius: 8px; }
+#preview-scroll { scrollbar-width: thin; scrollbar-color: #a3a9ba var(--desk); }
+#preview-scroll::-webkit-scrollbar-track, #preview-scroll::-webkit-scrollbar-corner { background: var(--desk); }
+#preview-scroll::-webkit-scrollbar-thumb { background: #b4b9c8; border-radius: 8px; }
+@media (max-width: 820px) {
+  main { display: flex; flex-direction: column; }
+  #splitter { display: none; }
+  .source-pane { height: 42dvh; flex: none; }
+  .preview-pane { flex: 1; min-height: 360px; }
+  .topbar { gap: 8px; padding: 8px; }
+}
+@media (max-width: 460px) {
+  .brand small { display: none; }
+  .mode button { padding-inline: 8px; }
+  .tools { display: none; }
+}
+@media (forced-colors: active) {
+  #highlight { visibility: hidden; }
+  #code { color: CanvasText; -webkit-text-fill-color: CanvasText; caret-color: CanvasText; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 36 36" aria-hidden="true">
+        <defs><linearGradient id="mark-fill" x2="1" y2="1"><stop stop-color="#9b8ad4"/><stop offset="1" stop-color="#3d365c"/></linearGradient></defs>
+        <rect width="36" height="36" rx="8" fill="url(#mark-fill)"/>
+        <path d="m8 20 14-12-3 12-11 6z" fill="#fff"/><path d="m18 22 8-5-2 8-7 4z" fill="#d6c5ff"/>
+      </svg>
+      <h1>ReTeX <small>Playground</small></h1>
+    </div>
+    <div class="mode" role="group" aria-label="Input language">
+      <button type="button" class="is-on" data-mode="retex" aria-pressed="true">ReTeX</button>
+      <button type="button" data-mode="markdown" aria-pressed="false">Markdown</button>
+    </div>
+    <span class="sep" aria-hidden="true"></span>
+    <div class="tools" role="toolbar" aria-label="Formatting">
+      <button type="button" data-insert="bold" title="Bold"><b>B</b></button>
+      <button type="button" data-insert="italic" title="Italic"><i>I</i></button>
+      <button type="button" data-insert="heading" title="Heading">H</button>
+      <button type="button" data-insert="list" title="List"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h.01M2.5 8h.01M2.5 12h.01M5.5 4h8M5.5 8h8M5.5 12h8"/></svg></button>
+      <button type="button" data-insert="code" title="Code">&lt;/&gt;</button>
+    </div>
+    <span class="grow"></span>
+    <div id="theme-controls" class="settings"><label class="setting">Theme <select id="theme"><option value="blank">Blank</option><option value="modern" selected>Modern</option><option value="classic">Classic</option><option value="compact">Compact</option></select></label></div>
+    <div id="paper-controls" class="settings" hidden><label class="setting">Style <select id="style"></select></label><label class="setting">Columns <select id="columns"><option value="">Auto</option><option>1</option><option>2</option></select></label><button id="print" type="button" class="print">Print view</button></div>
+  </header>
+  <main>
+    <section class="pane source-pane" aria-label="Source">
+      <div id="editor"><pre id="gutter" aria-hidden="true"></pre><pre id="highlight" aria-hidden="true"></pre><textarea id="code" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Document source"></textarea><div class="scroll-cap" aria-hidden="true"></div></div>
+    </section>
+    <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize editor" tabindex="0"></div>
+    <section class="pane preview-pane" aria-label="Preview">
+      <div id="preview-scroll"><div id="sheet"><div id="preview"></div></div></div>
+    </section>
+  </main>
+  <footer class="statusbar">
+    <span id="code-tag"></span>
+    <span id="status-mode">ReTeX</span>
+  </footer>
+</div>
+<style id="resume-style"></style>
+<script type="module">
+// The standalone preview handles the example document and basic Markdown.
+// In the playground directory, ../dist/index.js supplies the full renderer.
+function localPreviewLibrary() {
+  const attr = "data-rtx-pos";
+  const labels = { ieee: "IEEE", article: "Article" };
+  const inline = text => esc(text).replace(/\\(textbf|emph)\{([^{}]*)\}/g, (_, cmd, value) =>
+    cmd === "textbf" ? "<b>" + value + "</b>" : "<i>" + value + "</i>");
+  const inlineMd = text => esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*([^*]+)\*/g, "<em>$1</em>");
 
-    <main>
-      <section class="pane">
-        <div class="pane-head">Source <span class="tag" id="code-tag"></span></div>
-        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-      </section>
-      <section class="pane">
-        <div class="pane-head">Preview <span class="tag" id="preview-tag"></span></div>
-        <div id="preview-scroll"><div id="preview"></div></div>
-      </section>
-    </main>
-
-    <!-- Theme stylesheet for the rendered resume is injected here at runtime. -->
-    <style id="resume-style"></style>
-
-    <script type="module">
-      // The playground consumes the *built* library, so run `npm run build`
-      // first (the `npm run playground` script does this for you).
-      let lib;
-      try {
-        lib = await import("../dist/index.js");
-      } catch (e) {
-        document.getElementById("preview").innerHTML =
-          '<div class="err"><strong>Could not load the ReTeX bundle.</strong><br><br>' +
-          "Build it and serve over http first:<br><br>" +
-          "<code>npm run build</code><br><code>npm run playground</code><br><br>" +
-          "(ES module imports don't work from <code>file://</code> — use the dev server.)</div>";
-        throw e;
+  function resume(source) {
+    let output = "";
+    for (let pos = 0; pos < source.length;) {
+      const start = pos;
+      const command = /^\\(\w+)\{/.exec(source.slice(pos));
+      const group = command && readGroup(source, pos + command[0].length - 1, source.length);
+      const newline = source.indexOf("\n", pos);
+      let end = newline < 0 ? source.length : newline;
+      let tag = "p", content;
+      if (group) {
+        const type = command[1];
+        const value = source.slice(group.innerStart, group.innerEnd);
+        end = group.end;
+        content = inline(value);
+        if (type === "name") tag = "h1";
+        if (type === "title") tag = "h3";
+        if (type === "section") tag = "h2";
+        if (["location","email","website"].includes(type)) tag = "small";
+        if (type === "job" || type === "education") {
+          const fields = Object.fromEntries(value.split(/,\s*(?=\w+=)/).map(entry => {
+            const split = entry.indexOf("=");
+            return [entry.slice(0, split).trim(), inline(entry.slice(split + 1).trim())];
+          }));
+          content = "<b>" + (fields.title || fields.degree || "") + "</b><br>" +
+            [fields.company || fields.school, [fields.start,fields.end].filter(Boolean).join("–")].filter(Boolean).join(" · ");
+          const body = source[end] === "{" && readGroup(source, end, source.length);
+          if (body) {
+            const details = source.slice(body.innerStart, body.innerEnd).replace(/\\(?:begin|end)\{itemize\}/g,"").trim();
+            const items = details.split(/\\item\s+/).filter(Boolean);
+            content += details.startsWith("\\item") ? "<ul>" + items.map(item => "<li>" + inline(item) + "</li>").join("") + "</ul>" : "<p>" + inline(details) + "</p>";
+            end = body.end;
+          }
+          tag = "div";
+        }
+      } else {
+        // Join wrapped prose until a blank line or the next command.
+        while (end < source.length && /^[^\s\\]/.test(source.slice(end + 1))) {
+          const next = source.indexOf("\n", end + 1);
+          end = next < 0 ? source.length : next;
+        }
+        content = inline(source.slice(start,end).trim());
       }
+      if (content) output += '<' + tag + ' ' + attr + '="' + start + ':' + end + '">' + content + '</' + tag + '>';
+      pos = end + (source[end] === "\n" ? 1 : 0);
+    }
+    return output;
+  }
 
-      const {
-        ReTeXEngine,
-        getTheme,
-        paperStyleNames,
-        closestSourcePos,
-        pickElementForOffset,
-        readSourceType,
-        SOURCE_POS_ATTR,
-      } = lib;
+  function markdown(source) {
+    const parts = [];
+    let list = false, fence = false;
+    for (const line of source.split("\n")) {
+      const item = /^[-*]\s+(.*)/.exec(line);
+      if (list && !item) { parts.push("</ul>"); list = false; }
+      if (/^```/.test(line)) { parts.push(fence ? "</code></pre>" : "<pre><code>"); fence = !fence; continue; }
+      if (fence) { parts.push(esc(line) + "\n"); continue; }
+      if (item) {
+        if (!list) parts.push("<ul>");
+        list = true;
+        parts.push("<li>" + inlineMd(item[1]) + "</li>");
+        continue;
+      }
+      const h = /^(#{1,6})\s+(.*)/.exec(line);
+      if (h) parts.push("<h" + h[1].length + ">" + inlineMd(h[2]) + "</h" + h[1].length + ">");
+      else if (line.trim()) parts.push("<p>" + inlineMd(line) + "</p>");
+    }
+    if (list) parts.push("</ul>");
+    if (fence) parts.push("</code></pre>");
+    return parts.join("");
+  }
 
-      const codeEl = document.getElementById("code");
-      const previewEl = document.getElementById("preview");
-      const styleEl = document.getElementById("resume-style");
-      const themeSel = document.getElementById("theme");
-      const codeTag = document.getElementById("code-tag");
-      const previewTag = document.getElementById("preview-tag");
-      const modeSel = document.getElementById("mode");
-      const styleSel = document.getElementById("style");
-      const columnsSel = document.getElementById("columns");
-      const hintEl = document.getElementById("hint");
-      const RETEX_HINT = hintEl.textContent;
+  class LocalRenderer {
+    constructor({theme = "modern"} = {}) { this.theme = theme; }
+    fromMarkdown(source, options) { return {ast: {source, ...options}}; }
+    toHtml(doc) {
+      return '<article class="local-paper">' + (typeof doc === "string" ? resume(doc) : markdown(doc.source)) + '</article>';
+    }
+    styles(doc) {
+      const paper = typeof doc !== "string";
+      const serif = paper || this.theme === "classic";
+      const cols = paper ? doc.columns || (doc.style === "ieee" ? 2 : 1) : 1;
+      return `
+        .local-paper { color:#343540; font: ${this.theme === "compact" ? "13px/1.4" : "14px/1.6"} ${serif ? "Georgia,serif" : "system-ui,sans-serif"}; column-count:${cols}; column-gap:22px; }
+        .local-paper h1 { column-span:all; font:${this.theme === "blank" ? "bold 2em system-ui" : "500 clamp(31px,3.2vw,54px)/1.08 Georgia,serif"}; letter-spacing:-.045em; margin:0 0 9px; }
+        .local-paper h2 { break-after:avoid; border-bottom:1px solid #d3d4dd; margin:1.5em 0 .55em; padding-bottom:.25em; font-size:1.22em; }
+        .local-paper h3 { margin:.3em 0 .65em; font-size:1em; font-weight:550; }
+        .local-paper p { margin:.35em 0; } .local-paper small { display:inline-block; margin:0 .9em .15em 0; color:#666476; }
+        .local-paper div { margin:.8em 0; } .local-paper ul { padding-left:1.3em; }
+        .local-paper pre { overflow:auto; white-space:pre-wrap; }
+        @media(max-width:520px){.local-paper{column-count:${paper && doc.columns === 2 ? 2 : 1}}}
+      `;
+    }
+    toHtmlDocument(doc) {
+      return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Print view</title><style>body{max-width:800px;margin:3rem auto;padding:0 2rem}' + this.styles(doc) + '</style></head><body>' + this.toHtml(doc) + '</body></html>';
+    }
+  }
+  function range(el) {
+    const [start,end] = el.getAttribute(attr).split(":").map(Number);
+    return {start,end};
+  }
+  return {
+    ReTeXEngine: LocalRenderer, getTheme: name => name, paperStyleNames: () => Object.keys(labels),
+    SOURCE_POS_ATTR: attr, readSourceType: el => el.tagName.toLowerCase(),
+    closestSourcePos(target) { const node = target.closest("[" + attr + "]"); return node ? range(node) : null; },
+    pickElementForOffset(nodes, offset) {
+      return Array.from(nodes).find(el => { const {start,end} = range(el); return start <= offset && offset < end; });
+    }
+  };
+}
 
-      for (const name of paperStyleNames()) styleSel.add(new Option(name, name));
-      styleSel.value = "ieee";
+let projectLibrary;
+if (location.protocol !== "file:") {
+  try { projectLibrary = await import("../dist/index.js"); }
+  catch (error) { console.info("Using standalone preview.", error); }
+}
+const lib = projectLibrary || localPreviewLibrary();
+const {
+  ReTeXEngine,
+  getTheme,
+  paperStyleNames,
+  closestSourcePos,
+  pickElementForOffset,
+  SOURCE_POS_ATTR,
+} = lib;
 
-      const SAMPLE = String.raw`\name{Grace Hopper}
-\title{Distinguished Engineer \& Compiler Pioneer}
+const codeEl = document.getElementById("code");
+const highlightEl = document.getElementById("highlight");
+const editorEl = document.getElementById("editor");
+const previewEl = document.getElementById("preview");
+const styleEl = document.getElementById("resume-style");
+const themeSel = document.getElementById("theme");
+const codeTag = document.getElementById("code-tag");
+const styleSel = document.getElementById("style");
+const columnsSel = document.getElementById("columns");
+const modeButtons = document.querySelectorAll("[data-mode]");
+
+for (const name of paperStyleNames()) styleSel.add(new Option(name === "ieee" ? "IEEE" : name[0].toUpperCase() + name.slice(1), name));
+styleSel.value = "ieee";
+
+const SAMPLE = String.raw`\name{Grace Hopper}
+\title{Distinguished Engineer & Compiler Pioneer}
 \email{grace@example.com}
 \location{Arlington, VA}
 \website{https://gracehopper.dev}
@@ -255,180 +319,548 @@ tools. Coined the term \emph{debugging}. Reduced batch latency by 60%.
 \section{Skills}
 \skills{Compilers, COBOL, Systems Programming, Mentorship}`;
 
-      // Markdown mode opens the sample answer that ships next to this page.
-      const MARKDOWN_SAMPLE = await fetch("ai-response.md")
-        .then((r) => (r.ok ? r.text() : Promise.reject()))
-        .catch(() => "# A title\n\n## A section\n\nSome text with $x^2$ in it.");
+// Markdown mode opens the sample answer that ships next to this page.
+const examplePaper = "# Compiler notes\n\n## Overview\nA compiler translates a source program into a form a machine can execute.\n\n## Stages\n- Parse the source\n- Check its meaning\n- Generate instructions";
+const MARKDOWN_SAMPLE = !projectLibrary ? examplePaper : await fetch("ai-response.md")
+  .then((r) => (r.ok ? r.text() : Promise.reject()))
+  .catch(() => examplePaper);
 
-      let engine = new ReTeXEngine({ theme: getTheme(themeSel.value) });
-      const paperEngine = new ReTeXEngine();
-      const drafts = { retex: SAMPLE, markdown: MARKDOWN_SAMPLE };
-      let mode = "retex";
+let engine = new ReTeXEngine({ theme: getTheme(themeSel.value) });
+const paperEngine = new ReTeXEngine();
+const drafts = { retex: SAMPLE, markdown: MARKDOWN_SAMPLE };
+let mode = "retex";
 
-      function markdownAst() {
-        const columns = Number(columnsSel.value);
-        return paperEngine.fromMarkdown(codeEl.value, {
-          style: styleSel.value,
-          ...(columns ? { columns } : {}),
-        }).ast;
+function markdownAst() {
+  const columns = Number(columnsSel.value);
+  return paperEngine.fromMarkdown(codeEl.value, {
+    style: styleSel.value,
+    ...(columns ? { columns } : {}),
+  }).ast;
+}
+
+function esc(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function syn(text) {
+  return `<span class="syn">${esc(text)}</span>`;
+}
+function strong(html) {
+  return `<span class="md-strong">${html}</span>`;
+}
+
+function highlightInline(text) {
+  let html = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text.startsWith("$$", i)) {
+      const close = text.indexOf("$$", i + 2);
+      if (close !== -1) {
+        html += syn("$$") + esc(text.slice(i + 2, close)) + syn("$$");
+        i = close + 2;
+        continue;
       }
-
-      /* ----------------------------- render ----------------------------- */
-
-      let activeEl = null;
-      function clearActive() {
-        if (activeEl) activeEl.classList.remove("rtx-sync-active");
-        activeEl = null;
+    }
+    // $x^2$ is math; "$5" is currency and stays at full brightness.
+    if (text[i] === "$" && text[i + 1] && !/[\d\s]/.test(text[i + 1])) {
+      const close = text.indexOf("$", i + 1);
+      if (close > i + 1) {
+        html += syn("$") + esc(text.slice(i + 1, close)) + syn("$");
+        i = close + 1;
+        continue;
       }
-
-      function render() {
-        if (mode === "markdown") {
-          const ast = markdownAst();
-          styleEl.textContent = paperEngine.styles(ast);
-          previewEl.innerHTML = paperEngine.toHtml(ast);
-          activeEl = null;
-          return;
+    }
+    if (/^\\[()[\]]/.test(text.slice(i, i + 2))) {
+      html += syn(text.slice(i, i + 2));
+      i += 2;
+      continue;
+    }
+    if (text[i] === "`") {
+      const end = text.indexOf("`", i + 1);
+      if (end !== -1) {
+        html += syn("`") + esc(text.slice(i + 1, end)) + syn("`");
+        i = end + 1;
+        continue;
+      }
+    }
+    const two = text.slice(i, i + 2);
+    if (two === "**" || two === "__" || two === "~~") {
+      const close = text.indexOf(two, i + 2);
+      if (close !== -1) {
+        const inner = highlightInline(text.slice(i + 2, close));
+        html += syn(two) + (two === "~~" ? inner : strong(inner)) + syn(two);
+        i = close + 2;
+      } else {
+        html += syn(two);
+        i += 2;
+      }
+      continue;
+    }
+    if ((text[i] === "*" || text[i] === "_") && text[i + 1] !== text[i] && text[i + 1] !== " ") {
+      const marker = text[i];
+      const prev = i === 0 ? "" : text[i - 1];
+      const end = text.indexOf(marker, i + 1);
+      const inner = end === -1 ? "" : text.slice(i + 1, end);
+      const wordChar = /[\w]/;
+      const flanked =
+        end > i + 1 &&
+text[end - 1] !== " " &&
+        !(marker === "_" && wordChar.test(prev)) &&
+        !(marker === "_" && wordChar.test(text[end + 1] || ""));
+      if (flanked) {
+        html += syn(marker) + strong(highlightInline(inner)) + syn(marker);
+        i = end + 1;
+        continue;
+      }
+    }
+    const image = text[i] === "!" && text[i + 1] === "[";
+    if (image || text[i] === "[") {
+      const start = image ? i + 1 : i;
+      const endBracket = text.indexOf("]", start + 1);
+      if (endBracket !== -1 && text[endBracket + 1] === "(") {
+        const endParen = text.indexOf(")", endBracket + 2);
+        if (endParen !== -1) {
+          if (image) html += syn("!");
+          html += syn("[") + strong(highlightInline(text.slice(start + 1, endBracket))) + syn("]");
+          html += syn("(") + esc(text.slice(endBracket + 2, endParen)) + syn(")");
+          i = endParen + 1;
+          continue;
         }
-        styleEl.textContent = engine.styles(codeEl.value);
-        // `sourceMap: true` stamps every element with data-rtx-pos="start:end".
-        previewEl.innerHTML = engine.toHtml(codeEl.value, { sourceMap: true });
-        activeEl = null;
-        syncFromCaret(); // keep the caret↔preview highlight fresh after a recompile
       }
-
-      let renderTimer = 0;
-      function scheduleRender() {
-        clearTimeout(renderTimer);
-        renderTimer = setTimeout(render, 120);
-      }
-
-      /* --------------- forward sync: code caret → preview --------------- */
-
-      function syncFromCaret() {
-        const offset = codeEl.selectionStart;
-        const el = pickElementForOffset(
-          previewEl.querySelectorAll("[" + SOURCE_POS_ATTR + "]"),
-          offset,
-        );
-        if (el === activeEl) return;
-        clearActive();
-        if (el) {
-          el.classList.add("rtx-sync-active");
-          activeEl = el;
-          el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-          previewTag.textContent = describe(el);
-        } else {
-          previewTag.textContent = "";
+      if (text[start + 1] === "^") {
+        const end = text.indexOf("]", start + 2);
+        if (end !== -1) {
+          html += syn(text.slice(i, end + 1));
+          i = end + 1;
+          continue;
         }
       }
+    }
+    if (text[i] === "<" && /^https?:\/\//.test(text.slice(i + 1))) {
+      const end = text.indexOf(">", i + 1);
+      if (end !== -1) {
+        html += syn("<") + esc(text.slice(i + 1, end)) + syn(">");
+        i = end + 1;
+        continue;
+      }
+    }
+    html += esc(text[i]);
+    i += 1;
+  }
+  return html;
+}
 
-      /* --------------- reverse sync: preview click → code --------------- */
+function highlightTable(text) {
+  if (/^\s*\|?\s*:?-{3,}/.test(text)) return syn(text);
+  let html = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "|") {
+      html += syn("|");
+      i += 1;
+      continue;
+    }
+    const next = text.indexOf("|", i);
+    const cell = next === -1 ? text.slice(i) : text.slice(i, next);
+    html += highlightInline(cell);
+    i += cell.length;
+  }
+  return html;
+}
 
-      previewEl.addEventListener("click", (event) => {
-        const span = closestSourcePos(event.target);
-        if (!span) return;
-        codeEl.focus();
-        codeEl.setSelectionRange(span.start, span.end);
-        scrollCodeTo(span.start);
-        flashCode();
-        // Reflect the same element as active on both sides.
-        clearActive();
-        const hit = event.target.closest("[" + SOURCE_POS_ATTR + "]");
-        if (hit) {
-          hit.classList.add("rtx-sync-active");
-          activeEl = hit;
-          previewTag.textContent = describe(hit);
+function highlightMdLine(line) {
+  if (/^ {0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) return syn(line);
+  let html = "";
+  let i = 0;
+  const heading = /^(#{1,6})(?=\s|$)/.exec(line);
+  if (heading) {
+    html += syn(heading[1]);
+    html += strong(/^\s*\|/.test(line) ? highlightTable(line.slice(heading[1].length)) : highlightInline(line.slice(heading[1].length)));
+    return html;
+  } else {
+    const quote = /^( {0,3}(?:> ?)+)/.exec(line);
+    if (quote && quote[1].includes(">")) {
+      html += syn(quote[1]);
+      i = quote[1].length;
+    }
+    const list = /^( *)((?:[-+*]|\d+[.)]) +\[(?: |x|X)\] *|(?:[-+*]|\d+[.)]) +)/.exec(line.slice(i));
+    if (list) {
+      html += esc(list[1]) + syn(list[2]);
+      i += list[0].length;
+    }
+  }
+  const rest = line.slice(i);
+  html += /^\s*\|/.test(line) ? highlightTable(rest) : highlightInline(rest);
+  return html;
+}
+
+function highlightMarkdown(src) {
+  const lines = src.split("\n");
+  let fence = null;
+  const html = lines.map((line) => {
+    const open = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (open && open[2][0] === fence.ch && open[2].length >= fence.len && open[3].trim() === "") {
+        fence = null;
+        return syn(line);
+      }
+      return esc(line);
+    }
+    if (open) {
+      fence = { ch: open[2][0], len: open[2].length };
+      return syn(line);
+    }
+    return highlightMdLine(line);
+  });
+  return html.join("\n") + "\n";
+}
+
+const BOLD_CMDS = new Set(["textbf", "emph", "section", "subsection", "subsubsection", "name", "title"]);
+
+function readGroup(src, open, limit) {
+  let depth = 0;
+  for (let i = open; i < limit; i++) {
+    if (src[i] === "\\") {
+      i += 1;
+      continue;
+    }
+    if (src[i] === "{") depth += 1;
+    else if (src[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return { innerStart: open + 1, innerEnd: i, end: i + 1 };
+    }
+  }
+  return null;
+}
+
+function highlightRetexRange(src, start, end) {
+  let html = "";
+  let i = start;
+  while (i < end) {
+    if (src[i] === "%") {
+      const nl = src.indexOf("\n", i);
+      const stop = nl === -1 || nl >= end ? end : nl;
+      html += syn(src.slice(i, stop));
+      i = stop;
+      continue;
+    }
+    if (src[i] === "\\") {
+      const cmd = /^\\([a-zA-Z@]+|.)/.exec(src.slice(i, end));
+      if (cmd) {
+        html += syn(cmd[0]);
+        i += cmd[0].length;
+        if (BOLD_CMDS.has(cmd[1])) {
+          while (i < end && (src[i] === " " || src[i] === "\t")) {
+            html += esc(src[i]);
+            i += 1;
+          }
+          if (src[i] === "{") {
+            const group = readGroup(src, i, end);
+            if (group) {
+              html += syn("{");
+              html += strong(highlightRetexRange(src, group.innerStart, group.innerEnd));
+              html += syn("}");
+              i = group.end;
+            }
+          }
         }
-        codeTag.textContent = span.start + "–" + span.end;
-      });
-
-      /* ------------------------------ helpers --------------------------- */
-
-      function describe(el) {
-        const t = readSourceType(el) || el.tagName.toLowerCase();
-        const pos = el.getAttribute(SOURCE_POS_ATTR) || "";
-        return t + " · " + pos.replace(":", "–");
+        continue;
       }
+    }
+    if (src[i] === "{" || src[i] === "}") {
+      html += syn(src[i]);
+      i += 1;
+      continue;
+    }
+    html += esc(src[i]);
+    i += 1;
+  }
+  return html;
+}
 
-      function scrollCodeTo(offset) {
-        const line = codeEl.value.slice(0, offset).split("\n").length - 1;
-        const lh = parseFloat(getComputedStyle(codeEl).lineHeight) || 22;
-        const target = (line - 4) * lh;
-        codeEl.scrollTop = Math.max(0, target);
-      }
+function highlightRetex(src) {
+  return highlightRetexRange(src, 0, src.length) + "\n";
+}
 
-      let flashTimer = 0;
-      function flashCode() {
-        codeEl.classList.remove("flash");
-        void codeEl.offsetWidth; // restart the animation
-        codeEl.classList.add("flash");
-        clearTimeout(flashTimer);
-        flashTimer = setTimeout(() => codeEl.classList.remove("flash"), 500);
-      }
+const gutter = document.getElementById("gutter");
+let lineCount = 0;
+function paint() {
+  const count = codeEl.value.split("\n").length;
+  if (count !== lineCount) {
+    gutter.textContent = Array.from({length: count}, (_, i) => i + 1).join("\n");
+    lineCount = count;
+  }
+  gutter.scrollTop = codeEl.scrollTop;
+  highlightEl.innerHTML = mode === "markdown" ? highlightMarkdown(codeEl.value) : highlightRetex(codeEl.value);
+  highlightEl.scrollTop = codeEl.scrollTop;
+  highlightEl.scrollLeft = codeEl.scrollLeft;
+}
 
-      function updateCaretTag() {
-        codeTag.textContent = "caret @ " + codeEl.selectionStart;
-      }
+let activeEl = null;
+function clearActive() {
+  if (activeEl) activeEl.classList.remove("rtx-sync-active");
+  activeEl = null;
+}
 
-      /* ------------------------------ wiring ---------------------------- */
+function render() {
+  try {
+    renderDocument();
+  } catch (error) {
+    styleEl.textContent = "";
+    previewEl.textContent = error.message || "Unable to render this document.";
+    activeEl = null;
+  }
+  fitSheet();
+}
+function renderDocument() {
+  if (mode === "markdown") {
+    const ast = markdownAst();
+    styleEl.textContent = paperEngine.styles(ast);
+    previewEl.innerHTML = paperEngine.toHtml(ast);
+    activeEl = null;
+    return;
+  }
+  styleEl.textContent = engine.styles(codeEl.value);
+  // `sourceMap: true` stamps every element with data-rtx-pos="start:end".
+  previewEl.innerHTML = engine.toHtml(codeEl.value, { sourceMap: true });
+  activeEl = null;
+  syncFromCaret(); // keep the caret↔preview highlight fresh after a recompile
+}
 
-      codeEl.addEventListener("input", () => {
-        updateCaretTag();
-        scheduleRender();
-      });
-      // Caret moves (arrow keys, clicks, selection) drive the forward sync.
-      const onCaret = () => {
-        updateCaretTag();
-        syncFromCaret();
-      };
-      codeEl.addEventListener("keyup", onCaret);
-      codeEl.addEventListener("click", onCaret);
-      document.addEventListener("selectionchange", () => {
-        if (document.activeElement === codeEl) onCaret();
-      });
+let renderTimer = 0;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 120);
+}
 
-      modeSel.addEventListener("change", () => {
-        drafts[mode] = codeEl.value;
-        mode = modeSel.value;
-        codeEl.value = drafts[mode];
-        const markdown = mode === "markdown";
-        document.getElementById("paper-controls").hidden = !markdown;
-        document.getElementById("theme-controls").hidden = markdown;
-        hintEl.textContent = markdown
-          ? "Paste an AI answer or any Markdown, then pick a paper style"
-          : RETEX_HINT;
-        previewTag.textContent = "";
-        render();
-      });
-      styleSel.addEventListener("change", render);
-      columnsSel.addEventListener("change", render);
+function syncFromCaret() {
+  if (mode !== "retex" || document.activeElement !== codeEl) return;
+  const offset = codeEl.selectionStart;
+  const el = pickElementForOffset(
+    previewEl.querySelectorAll("[" + SOURCE_POS_ATTR + "]"),
+    offset,
+  );
+  if (el === activeEl) return;
+  clearActive();
+  if (el) {
+    el.classList.add("rtx-sync-active");
+    activeEl = el;
+    const viewport = document.getElementById("preview-scroll");
+    const box = el.getBoundingClientRect(), view = viewport.getBoundingClientRect();
+    if (box.top < view.top) viewport.scrollTop += box.top - view.top;
+    else if (box.bottom > view.bottom) viewport.scrollTop += box.bottom - view.bottom;
+  }
+}
 
-      document.getElementById("print").addEventListener("click", () => {
-        // A base URL lets the page, opened from a blob, still find relative images.
-        const html = paperEngine
-          .toHtmlDocument(markdownAst())
-          .replace("<head>", `<head><base href="${location.href}">`);
-        window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })));
-      });
+previewEl.addEventListener("click", (event) => {
+  const span = closestSourcePos(event.target);
+  if (!span) return;
+  codeEl.focus();
+  codeEl.setSelectionRange(span.start, span.end);
+  scrollCodeTo(span.start);
+  flashCode();
+  // Reflect the same element as active on both sides.
+  clearActive();
+  const hit = event.target.closest("[" + SOURCE_POS_ATTR + "]");
+  if (hit) {
+    hit.classList.add("rtx-sync-active");
+    activeEl = hit;
+  }
+  updateCaretTag();
+});
 
-      themeSel.addEventListener("change", () => {
-        engine = new ReTeXEngine({ theme: getTheme(themeSel.value) });
-        render();
-      });
 
-      // Support tab indentation in the editor (handy for ReTeX nesting).
-      codeEl.addEventListener("keydown", (e) => {
-        if (e.key !== "Tab") return;
-        e.preventDefault();
-        const s = codeEl.selectionStart;
-        const en = codeEl.selectionEnd;
-        codeEl.setRangeText("  ", s, en, "end");
-        scheduleRender();
-      });
 
-      codeEl.value = SAMPLE;
-      updateCaretTag();
-      render();
-    </script>
-  </body>
+function scrollCodeTo(offset) {
+  const line = codeEl.value.slice(0, offset).split("\n").length - 1;
+  const lh = parseFloat(getComputedStyle(codeEl).lineHeight) || 22;
+  const target = (line - 4) * lh;
+  codeEl.scrollTop = Math.max(0, target);
+  highlightEl.scrollTop = codeEl.scrollTop;
+}
+
+let flashTimer = 0;
+function flashCode() {
+  editorEl.classList.remove("flash");
+  void editorEl.offsetWidth; // restart the animation
+  editorEl.classList.add("flash");
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => editorEl.classList.remove("flash"), 500);
+}
+
+function updateCaretTag() {
+  const before = codeEl.value.slice(0, codeEl.selectionStart);
+  codeTag.textContent = "Ln " + before.split("\n").length + ", Col " + (before.length - before.lastIndexOf("\n"));
+}
+
+function setMode(next) {
+  if (next === mode) return;
+  drafts[mode] = codeEl.value;
+  mode = next;
+  codeEl.value = drafts[mode];
+  codeEl.setSelectionRange(0, 0);
+  codeEl.scrollTop = 0;
+  codeEl.scrollLeft = 0;
+  for (const btn of modeButtons) {
+    const on = btn.dataset.mode === mode;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  const markdown = mode === "markdown";
+  document.getElementById("paper-controls").hidden = !markdown;
+  document.getElementById("theme-controls").hidden = markdown;
+  document.getElementById("status-mode").textContent = markdown ? "Markdown" : "ReTeX";
+  paint();
+  updateCaretTag();
+  render();
+}
+
+codeEl.addEventListener("input", () => {
+  updateCaretTag();
+  paint();
+  scheduleRender();
+});
+codeEl.addEventListener("scroll", () => {
+  gutter.scrollTop = codeEl.scrollTop;
+  highlightEl.scrollTop = codeEl.scrollTop;
+  highlightEl.scrollLeft = codeEl.scrollLeft;
+});
+// Caret moves (arrow keys, clicks, selection) drive the forward sync.
+const onCaret = () => {
+  updateCaretTag();
+  syncFromCaret();
+};
+codeEl.addEventListener("keyup", onCaret);
+codeEl.addEventListener("click", onCaret);
+document.addEventListener("selectionchange", () => {
+  if (document.activeElement === codeEl) onCaret();
+});
+
+for (const btn of modeButtons) {
+  btn.addEventListener("click", () => setMode(btn.dataset.mode));
+}
+styleSel.addEventListener("change", render);
+columnsSel.addEventListener("change", render);
+
+document.getElementById("print").addEventListener("click", () => {
+  // A base URL lets the page, opened from a blob, still find relative images.
+  const html = paperEngine
+    .toHtmlDocument(markdownAst())
+    .replace("<head>", `<head><base href="${location.href}">`);
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+
+themeSel.addEventListener("change", () => {
+  engine = new ReTeXEngine({ theme: getTheme(themeSel.value) });
+  render();
+});
+
+// Support tab indentation in the editor (handy for ReTeX nesting).
+codeEl.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+e.preventDefault();
+  const s = codeEl.selectionStart;
+  const en = codeEl.selectionEnd;
+  codeEl.setRangeText("  ", s, en, "end");
+  paint();
+  scheduleRender();
+});
+
+const INSERT = {
+  retex: {
+    bold: ["\\textbf{", "}"],
+    italic: ["\\emph{", "}"],
+    heading: ["\\section{", "}"],
+    list: ["\\begin{itemize}\n  \\item ", "\n\\end{itemize}"],
+    code: ["\\code{", "}"],
+  },
+  markdown: {
+    bold: ["**", "**"],
+    italic: ["*", "*"],
+    heading: ["## ", ""],
+    list: ["- ", ""],
+    code: ["`", "`"],
+  },
+};
+
+function insertMarkup(kind) {
+  const [before, after] = INSERT[mode][kind];
+  const start = codeEl.selectionStart;
+  const end = codeEl.selectionEnd;
+  const selected = codeEl.value.slice(start, end);
+  const placeholder = kind === "heading" ? "Heading" : kind === "list" ? "Item" : kind === "code" ? "code" : "text";
+  const inner = selected || placeholder;
+  codeEl.setRangeText(before + inner + after, start, end, "end");
+  const innerStart = start + before.length;
+  codeEl.setSelectionRange(innerStart, innerStart + inner.length);
+  codeEl.focus();
+  updateCaretTag();
+  paint();
+  scheduleRender();
+}
+
+for (const button of document.querySelectorAll("[data-insert]")) {
+  button.addEventListener("click", () => insertMarkup(button.dataset.insert));
+}
+
+// The sheet stays at the real page width (the same width the PDF uses) and is
+// scaled to the pane, so an inch of margin stays the same fraction of the page.
+const previewScroll = document.getElementById("preview-scroll");
+const sheetEl = document.getElementById("sheet");
+function fitSheet() {
+  const root = previewEl.querySelector(".retex-resume, .local-paper");
+  let pageW = 8.5 * 96;
+  if (root) {
+    const max = getComputedStyle(root).maxWidth;
+    const px = Number.parseFloat(max);
+    if (max.endsWith("px") && px > 240) pageW = px;
+  }
+  const avail = Math.max(160, previewScroll.clientWidth - 40);
+  const scale = Math.min(1, avail / pageW);
+  previewEl.style.width = pageW + "px";
+  previewEl.style.transform = "scale(" + scale + ")";
+  sheetEl.style.width = pageW * scale + "px";
+  sheetEl.style.height = previewEl.offsetHeight * scale + "px";
+}
+
+new ResizeObserver(fitSheet).observe(previewScroll);
+new ResizeObserver(fitSheet).observe(previewEl);
+
+const splitter = document.getElementById("splitter");
+splitter.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  splitter.setPointerCapture(event.pointerId);
+  const frame = splitter.parentElement;
+  const drag = (ev) => {
+    const box = frame.getBoundingClientRect();
+    const x = Math.min(box.right - 300, Math.max(box.left + 300, ev.clientX));
+    frame.style.setProperty("--editor-w", (x - box.left) + "px");
+    fitSheet();
+  };
+  const stop = () => {
+    splitter.removeEventListener("pointermove", drag);
+    splitter.removeEventListener("pointerup", stop);
+  };
+  splitter.addEventListener("pointermove", drag);
+  splitter.addEventListener("pointerup", stop);
+});
+splitter.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  const frame = splitter.parentElement;
+  const current = frame.style.getPropertyValue("--editor-w");
+  const basis = current.endsWith("px") ? parseFloat(current) : frame.clientWidth / 2;
+  const next = basis + (event.key === "ArrowRight" ? 24 : -24);
+  frame.style.setProperty("--editor-w", Math.min(frame.clientWidth - 300, Math.max(300, next)) + "px");
+  fitSheet();
+});
+
+codeEl.value = SAMPLE;
+codeEl.setSelectionRange(0, 0);
+updateCaretTag();
+paint();
+render();
+</script>
+</body>
 </html>
